@@ -110,7 +110,8 @@ def process(args):
     # Generate config YAML
     gen_config_yaml(
         out_root, spm_filename_prefix + ".model", specaugment_policy="ld",
-        asr_spm_filename=spm_filename_prefix + ".model"
+        asr_spm_filename=spm_filename_prefix + ".model",
+        share_src_and_tgt=True
     )
     # Clean up
     shutil.rmtree(feature_root)

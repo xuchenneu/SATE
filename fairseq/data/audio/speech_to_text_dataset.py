@@ -85,7 +85,7 @@ class S2TDataConfig(object):
         a dictionary with `bpe` providing the tokenizer name and
         the other items providing the tokenizer-specific arguments.
         Tokenizers are defined in `fairseq.data.encoders.*`"""
-        return self.config.get("src_bpe_tokenizer", {"bpe": None})
+        return self.config.get("src_bpe_tokenizer", None)
 
     @property
     def prepend_tgt_lang_tag(self) -> bool:

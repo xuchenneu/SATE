@@ -234,7 +234,8 @@ def process(args):
                 cur_root / "gcmvn.npz" if args.cmvn_type == "global"
                 else None
             ),
-            asr_spm_filename=asr_spm_filename
+            asr_spm_filename=asr_spm_filename,
+            share_src_and_tgt=True if args.task == "asr" else False
         )
         # Clean up
         shutil.rmtree(feature_root)
