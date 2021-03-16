@@ -29,7 +29,8 @@ pwd_dir=$PWD
 
 # dataset
 src_lang=en
-lang=${src_lang}
+tgt_lang=de
+lang=${src_lang}-${tgt_lang}
 
 dataset=mustc
 task=speech_to_text
@@ -124,7 +125,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
 
     cmd="python3 -u ${root_dir}/fairseq_cli/train.py
         $data_dir/$lang
-		--config-yaml ${data_config}
+        --config-yaml ${data_config}
         --train-config ${train_config}
         --task speech_to_text
         --max-tokens ${max_tokens}
