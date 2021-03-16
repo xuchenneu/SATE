@@ -204,13 +204,23 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 		dec_model=checkpoint_best.pt
 	fi
 
+    if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
+		if [[ ${gpu_num} -eq 0 ]]; then
+			device=()
+		else
+        	source ./local/utils.sh
+        	device=$(get_devices $gpu_num 0)
+		fi
+    fi
+    export CUDA_VISIBLE_DEVICES=${device}
+
 	#tmp_file=$(mktemp ${model_dir}/tmp-XXXXX)
 	#trap 'rm -rf ${tmp_file}' EXIT
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
 	for subset in ${test_subset[@]}; do
-        subset=${subset}_asr
+        subset=${subset}
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}/$lang
         --config-yaml ${data_config}

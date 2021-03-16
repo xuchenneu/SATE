@@ -1,11 +1,13 @@
 #! /bin/bash
 
-# training the model
-
 gpu_num=1
 
 test_subset=(tst-COMMON)
-exp_name=test
+
+exp_name=
+if [ "$#" -eq 1 ]; then
+    exp_name=$1
+fi
 
 n_average=10
 beam_size=5

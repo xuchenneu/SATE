@@ -205,6 +205,16 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 		dec_model=checkpoint_best.pt
 	fi
 
+    if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
+		if [[ ${gpu_num} -eq 0 ]]; then
+			device=()
+		else
+        	source ./local/utils.sh
+        	device=$(get_devices $gpu_num 0)
+		fi
+    fi
+    export CUDA_VISIBLE_DEVICES=${device}
+
 	#tmp_file=$(mktemp ${model_dir}/tmp-XXXXX)
 	#trap 'rm -rf ${tmp_file}' EXIT
 	result_file=${model_dir}/decode_result
@@ -221,7 +231,11 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
-        --scoring wer"
+        --scoring wer
+        --wer-tokenizer 13a
+        --wer-lowercase
+        --wer-remove-punct
+        "
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 
         if [[ $eval -eq 1 ]]; then
