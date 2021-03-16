@@ -55,7 +55,7 @@ class RelPositionMultiheadAttention(MultiheadAttention):
 
         # linear transformation for positional encoding
         self.linear_pos = quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=False), q_noise, qn_block_size
+            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
         )
 
         # these two learnable bias are used in matrix c and matrix d
@@ -63,7 +63,7 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         self.pos_bias_u = Parameter(torch.Tensor(self.num_heads, self.head_dim))
         self.pos_bias_v = Parameter(torch.Tensor(self.num_heads, self.head_dim))
 
-        nn.init.xavier_uniform_(self.linear_pos.weight)
+        # nn.init.xavier_uniform_(self.linear_pos.weight)
         nn.init.xavier_normal_(self.pos_bias_u)
         nn.init.xavier_normal_(self.pos_bias_v)
 
@@ -109,6 +109,7 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         assert list(query.size()) == [tgt_len, bsz, embed_dim]
 
         if (
+            False and
             not self.onnx_trace
             and not is_tpu  # don't use PyTorch version on TPUs
             and incremental_state is None
@@ -196,6 +197,8 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         #     .view(tgt_len, bsz * self.num_heads, self.head_dim)
         #     .transpose(0, 1)
         # )
+        # prepare q for RPE  # (tgt_len, bsz, num_heads, head_dim)
+        q = q.contiguous().view(tgt_len, bsz, self.num_heads, self.head_dim)
         if k is not None:
             k = (
                 k.contiguous()
@@ -279,18 +282,19 @@ class RelPositionMultiheadAttention(MultiheadAttention):
                     dim=1,
                 )
 
+        pos_emb = pos_emb.transpose(0, 1)
         p_rep = self.linear_pos(pos_emb).view(bsz, -1, self.num_heads, self.head_dim)
-        p_rep = p_rep.contiguous().transpose(1, 2).view(bsz * self.num_heads, -1, self.head_dim)
+        p_rep = p_rep.transpose(1, 2).contiguous().view(bsz * self.num_heads, -1, self.head_dim)
 
         # (batch * head, time1, d_k)
         q_with_bias_u = (
-            (q + self.pos_bias_u) .contiguous()
+            (q + self.pos_bias_u).contiguous()
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
         # (batch * head, time1, d_k)
         q_with_bias_v = (
-            (q + self.pos_bias_v) .contiguous()
+            (q + self.pos_bias_v).contiguous()
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
@@ -298,15 +302,15 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         # compute attention score
         # first compute matrix a and matrix c
         # as described in https://arxiv.org/abs/1901.02860 Section 3.3
-        # (batch, head, time1, time2)
+        # (batch * head, time1, time2)
         matrix_ac = torch.bmm(q_with_bias_u, k.transpose(1, 2))
 
         # compute matrix b and matrix d
-        # (batch, head, time1, time2)
+        # (batch * head, time1, time2)
         matrix_bd = torch.bmm(q_with_bias_v, p_rep.transpose(1, 2))
 
         def rel_shift(x, zero_triu=False):
-            """Compute relative positinal encoding.
+            """Compute relative positional encoding.
 
             :param torch.Tensor x: (batch, time, size)
             :param bool zero_triu: return the lower triangular part of the matrix
@@ -323,8 +327,11 @@ class RelPositionMultiheadAttention(MultiheadAttention):
 
             return x
 
-        matrix_bd = rel_shift(matrix_bd)
-        attn_weights = (matrix_ac + matrix_bd) / self.scaling
+        matrix_bd = matrix_bd.contiguous().view(bsz, self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
+        matrix_bd = rel_shift(
+            matrix_bd,
+        ).contiguous().view(bsz * self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
+        attn_weights = (matrix_ac + matrix_bd) * self.scaling
 
         # attn_weights = torch.bmm(q, k.transpose(1, 2))
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)

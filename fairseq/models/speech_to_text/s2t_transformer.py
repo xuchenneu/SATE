@@ -319,6 +319,7 @@ class S2TTransformerEncoder(FairseqEncoder):
         else:
             self.layer_norm = None
 
+        self.attn_type = getattr(args, "encoder_attention_type", "selfattn")
         self.use_ctc = ("ctc" in getattr(args, "criterion", False)) and \
                        (getattr(args, "ctc_weight", False) > 0)
         if self.use_ctc:
@@ -344,11 +345,13 @@ class S2TTransformerEncoder(FairseqEncoder):
 
         encoder_padding_mask = lengths_to_padding_mask(input_lengths)
         positions = self.embed_positions(encoder_padding_mask).transpose(0, 1)
-        x += positions
+        if self.attn_type != "rel_selfattn":
+            x += positions
+        # x += positions
         x = self.dropout_module(x)
 
         for layer in self.transformer_layers:
-            x = layer(x, encoder_padding_mask)
+            x = layer(x, encoder_padding_mask, pos_emb=positions)
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)

@@ -685,6 +685,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             ]
         )
         self.num_layers = len(self.layers)
+        self.attn_type = getattr(args, "decoder_attention_type", "selfattn")
 
         if args.decoder_normalize_before and not getattr(
             args, "no_decoder_final_norm", False
@@ -892,6 +893,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 self_attn_padding_mask=self_attn_padding_mask,
                 need_attn=bool((idx == alignment_layer)),
                 need_head_weights=bool((idx == alignment_layer)),
+                pos_emb=positions
             )
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:

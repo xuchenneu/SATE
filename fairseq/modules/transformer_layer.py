@@ -35,6 +35,7 @@ class TransformerEncoderLayer(nn.Module):
         self.embed_dim = args.encoder_embed_dim
         self.quant_noise = getattr(args, 'quant_noise_pq', 0)
         self.quant_noise_block_size = getattr(args, 'quant_noise_pq_block_size', 8) or 8
+        self.attn_type = getattr(args, "encoder_attention_type", "selfattn")
         self.self_attn = self.build_self_attention(self.embed_dim, args)
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
         self.dropout_module = FairseqDropout(
@@ -77,13 +78,12 @@ class TransformerEncoderLayer(nn.Module):
         )
 
     def build_self_attention(self, embed_dim, args):
-        attn_type = getattr(args, "encoder_attention_type", "selfattn")
-        if attn_type == "selfattn":
+        if self.attn_type == "selfattn":
             attn_func = MultiheadAttention
-        elif attn_type == "rel_selfattn":
+        elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
         else:
-            print("The attention type %s is not supported!" % attn_type)
+            print("The attention type %s is not supported!" % self.attn_type)
             exit(1)
 
         return attn_func(
@@ -112,7 +112,10 @@ class TransformerEncoderLayer(nn.Module):
                     state_dict["{}.{}.{}".format(name, new, m)] = state_dict[k]
                     del state_dict[k]
 
-    def forward(self, x, encoder_padding_mask: Optional[Tensor], attn_mask: Optional[Tensor] = None):
+    def forward(self, x,
+                encoder_padding_mask: Optional[Tensor],
+                attn_mask: Optional[Tensor] = None,
+                pos_emb: Optional[Tensor] = None):
         """
         Args:
             x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
@@ -124,6 +127,7 @@ class TransformerEncoderLayer(nn.Module):
                 `attn_mask[tgt_i, src_j] = 1` means that when calculating the
                 embedding for `tgt_i`, we exclude (mask out) `src_j`. This is
                 useful for strided self-attention.
+            positions (Tensor): the position embedding for relative position encoding
 
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
@@ -139,14 +143,26 @@ class TransformerEncoderLayer(nn.Module):
         residual = x
         if self.normalize_before:
             x = self.self_attn_layer_norm(x)
-        x, _ = self.self_attn(
-            query=x,
-            key=x,
-            value=x,
-            key_padding_mask=encoder_padding_mask,
-            need_weights=False,
-            attn_mask=attn_mask,
-        )
+        if self.attn_type == "rel_selfattn":
+            assert pos_emb is not None, "Positions is necessary for RPE!"
+            x, _ = self.self_attn(
+                query=x,
+                key=x,
+                value=x,
+                key_padding_mask=encoder_padding_mask,
+                need_weights=False,
+                attn_mask=attn_mask,
+                pos_emb=pos_emb
+            )
+        else:
+            x, _ = self.self_attn(
+                query=x,
+                key=x,
+                value=x,
+                key_padding_mask=encoder_padding_mask,
+                need_weights=False,
+                attn_mask=attn_mask,
+            )
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
         if not self.normalize_before:
@@ -195,6 +211,7 @@ class TransformerDecoderLayer(nn.Module):
 
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
 
+        self.attn_type = getattr(args, "decoder_attention_type", "selfattn")
         self.self_attn = self.build_self_attention(
             self.embed_dim,
             args,
@@ -256,13 +273,12 @@ class TransformerDecoderLayer(nn.Module):
     def build_self_attention(
         self, embed_dim, args, add_bias_kv=False, add_zero_attn=False
     ):
-        attn_type = getattr(args, "decoder_attention_type", "selfattn")
-        if attn_type == "selfattn":
+        if self.attn_type == "selfattn":
             attn_func = MultiheadAttention
-        elif attn_type == "rel_selfattn":
+        elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
         else:
-            print("The attention type %s is not supported!" % attn_type)
+            print("The attention type %s is not supported!" % self.attn_type)
             exit(1)
 
         return attn_func(
@@ -277,16 +293,7 @@ class TransformerDecoderLayer(nn.Module):
         )
 
     def build_encoder_attention(self, embed_dim, args):
-        attn_type = getattr(args, "decoder_attention_type", "selfattn")
-        if attn_type == "selfattn":
-            attn_func = MultiheadAttention
-        elif attn_type == "rel_selfattn":
-            attn_func = RelPositionMultiheadAttention
-        else:
-            print("The attention type %s is not supported!" % attn_type)
-            exit(1)
-
-        return attn_func(
+        return MultiheadAttention(
             embed_dim,
             args.decoder_attention_heads,
             kdim=getattr(args, "encoder_embed_dim", None),
@@ -315,6 +322,7 @@ class TransformerDecoderLayer(nn.Module):
         self_attn_padding_mask: Optional[torch.Tensor] = None,
         need_attn: bool = False,
         need_head_weights: bool = False,
+        pos_emb: Optional[Tensor] = None,
     ):
         """
         Args:
@@ -370,15 +378,28 @@ class TransformerDecoderLayer(nn.Module):
         else:
             y = x
 
-        x, attn = self.self_attn(
-            query=x,
-            key=y,
-            value=y,
-            key_padding_mask=self_attn_padding_mask,
-            incremental_state=incremental_state,
-            need_weights=False,
-            attn_mask=self_attn_mask,
-        )
+        if self.attn_type == "rel_selfattn":
+            assert pos_emb is not None, "Positions is necessary for RPE!"
+            x, attn = self.self_attn(
+                query=x,
+                key=y,
+                value=y,
+                key_padding_mask=self_attn_padding_mask,
+                incremental_state=incremental_state,
+                need_weights=False,
+                attn_mask=self_attn_mask,
+                pos_emb=pos_emb
+            )
+        else:
+            x, attn = self.self_attn(
+                query=x,
+                key=y,
+                value=y,
+                key_padding_mask=self_attn_padding_mask,
+                incremental_state=incremental_state,
+                need_weights=False,
+                attn_mask=self_attn_mask,
+            )
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
         if not self.normalize_before:
