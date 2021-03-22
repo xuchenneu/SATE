@@ -30,7 +30,7 @@ if [[ -n ${extra_tag} ]]; then
     cmd="$cmd --extra_tag ${extra_tag}"
 fi
 if [[ -n ${extra_parameter} ]]; then
-    cmd="$cmd --extra_parameter ${extra_parameter}"
+    cmd="$cmd --extra_parameter \"${extra_parameter}\""
 fi
 
 echo $cmd

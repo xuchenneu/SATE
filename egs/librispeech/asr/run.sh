@@ -74,7 +74,10 @@ fi
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=$(basename ${train_config%.*})_${exp_tag}${extra_tag}
+    exp_name=$(basename ${train_config%.*})_${exp_tag}
+    if [[ -n ${extra_tag} ]]; then
+        exp_name=${exp_name}_${extra_tag}
+    fi
 fi
 
 model_dir=$root_dir/../checkpoints/$dataset/$task/asr/${exp_name}

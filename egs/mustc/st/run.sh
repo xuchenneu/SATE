@@ -36,8 +36,8 @@ dataset=mustc
 task=speech_to_text
 vocab_type=unigram
 asr_vocab_size=5000
-vocab_size=8000
-share_dict=0
+vocab_size=10000
+share_dict=1
 
 data_dir=~/st/data/${dataset}
 test_subset=(tst-COMMON)
@@ -83,7 +83,10 @@ fi
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=$(basename ${train_config%.*})_${exp_tag}${extra_tag}
+    exp_name=$(basename ${train_config%.*})_${exp_tag}
+    if [[ -n ${extra_tag} ]]; then
+        exp_name=${exp_name}_${extra_tag}
+    fi
 fi
 
 model_dir=$root_dir/../checkpoints/$dataset/$task/st/${exp_name}
@@ -103,7 +106,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --vocab-type ${vocab_type}
         --vocab-size ${asr_vocab_size}"
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
-    #[[ $eval -eq 1 && ${share_dict} -ne 1 ]] && eval $cmd
+    [[ $eval -eq 1 && ${share_dict} -ne 1 ]] && eval $cmd
 
     echo "stage 0: ST Data Preparation"
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
