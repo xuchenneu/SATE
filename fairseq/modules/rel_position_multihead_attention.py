@@ -55,7 +55,7 @@ class RelPositionMultiheadAttention(MultiheadAttention):
 
         # linear transformation for positional encoding
         self.linear_pos = quant_noise(
-            nn.Linear(embed_dim, embed_dim, bias=bias), q_noise, qn_block_size
+            nn.Linear(embed_dim, embed_dim, bias=False), q_noise, qn_block_size
         )
 
         # these two learnable bias are used in matrix c and matrix d
@@ -312,25 +312,36 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         def rel_shift(x, zero_triu=False):
             """Compute relative positional encoding.
 
-            :param torch.Tensor x: (batch, time, size)
-            :param bool zero_triu: return the lower triangular part of the matrix
+            Args:
+                x (torch.Tensor): Input tensor (batch, head, time1, 2*time1-1).
+                time1 means the length of query vector.
+            Returns:
+                torch.Tensor: Output tensor.
             """
+
             zero_pad = torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype)
             x_padded = torch.cat([zero_pad, x], dim=-1)
 
             x_padded = x_padded.view(*x.size()[:2], x.size(3) + 1, x.size(2))
             x = x_padded[:, :, 1:].view_as(x)
 
-            if zero_triu:
-                ones = torch.ones((x.size(2), x.size(3)))
-                x = x * torch.tril(ones, x.size(3) - x.size(2))[None, None, :, :]
+            # zero_pad = torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype)
+            # x_padded = torch.cat([zero_pad, x], dim=-1)
+            #
+            # x_padded = x_padded.view(*x.size()[:2], x.size(3) + 1, x.size(2))
+            # x = x_padded[:, :, 1:].view_as(x)[
+            #     :, :, :, : x.size(-1) // 2 + 1
+            # ]  # only keep the positions from 0 to time2
 
+            if zero_triu:
+                ones = torch.ones((x.size(2), x.size(3)), device=x.device)
+                x = x * torch.tril(ones, x.size(3) - x.size(2))[None, None, :, :]
             return x
 
-        matrix_bd = matrix_bd.contiguous().view(bsz, self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
-        matrix_bd = rel_shift(
-            matrix_bd,
-        ).contiguous().view(bsz * self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
+        # matrix_bd = matrix_bd.contiguous().view(bsz, self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
+        # matrix_bd = rel_shift(
+        #     matrix_bd,
+        # ).contiguous().view(bsz * self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
         attn_weights = (matrix_ac + matrix_bd) * self.scaling
 
         # attn_weights = torch.bmm(q, k.transpose(1, 2))

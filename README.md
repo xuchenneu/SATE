@@ -2,29 +2,33 @@
 
 # 简要说明
 
-Fairseq_ST基于原始的Fairseq，仅做了少量修改增加易用性以及对语音翻译任务的适配。
+Fairseq_ST基于原始的Fairseq，提高了程序易用性以及对语音到文本任务的适配。
 
 目前支持功能：
 
-- 针对每个数据集创建egs文件夹保存运行脚本
+- 针对每个数据集创建egs文件夹保存运行脚本，目前包括LibriSpeech语音识别数据集和MuST-C语音翻译数据集
 - 通过读取yaml配置文件进行训练
 - 支持ctc多任务学习
 
 后续目标：
 
-- 输入层CNN结构调整
+- 相对位置表示
 - Conformer模型结构
 - 预训练模型加载
 - SATE模型结构
-
-此外，语音翻译任务需要对每个任务预先下载好原始数据，除了已经提供的数据集，如LibriSpeech和MuST-C外，其他数据集需要额外编写代码进行处理，参考examples/speech_to_text路径下的处理文件。
 
 # 需求条件
 
 1. Python ≥3.6
 2. torch ≥ 1.4, torchaudio ≥ 0.4.0, cuda ≥ 10.1
 3. apex
+```
+pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+```
 4. nccl
+```
+make -j src.build CUDA_HOME=<path to cuda install>
+```
 5. gcc ≥ 4.9
 6. python包 pandas sentencepiece configargparse gpustat tensorboard editdistance
 
@@ -53,6 +57,8 @@ st文件夹下包含了数据文件夹data和代码文件夹fairseq，tools文�
 使用过程中注意配置.bashrc文件。
 
 # 代码结构
+
+此外，语音翻译任务需要对每个任务预先下载好原始数据，除了已经提供的数据集，如LibriSpeech和MuST-C外，其他数据集需要额外编写代码进行处理，参考examples/speech_to_text路径下的处理文件。
 
 运行脚本存放于fairseq根目录下的egs文件夹，针对每个数据集分别建立了不同的文件夹来执行操作，目前包括语音识别数据集LibriSpeech以及语音翻译数据集MuST-C的执行脚本。
 

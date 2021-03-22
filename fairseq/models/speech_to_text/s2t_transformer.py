@@ -347,7 +347,6 @@ class S2TTransformerEncoder(FairseqEncoder):
         positions = self.embed_positions(encoder_padding_mask).transpose(0, 1)
         if self.attn_type != "rel_selfattn":
             x += positions
-        # x += positions
         x = self.dropout_module(x)
 
         for layer in self.transformer_layers:
