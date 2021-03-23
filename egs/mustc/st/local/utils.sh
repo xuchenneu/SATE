@@ -13,7 +13,7 @@ get_devices(){
         do
             line=`expr $dev + 2`
             use=`cat $record | head -n $line | tail -1 | cut -d '|' -f3 | cut -d '/' -f1`
-            if [[ $use -eq 0 ]]; then
+            if [[ $use -lt 10 ]]; then
                 device[$count]=$dev
                 count=`expr $count + 1`
                 if [[ $count -eq $gpu_num ]]; then

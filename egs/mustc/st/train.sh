@@ -13,7 +13,7 @@ extra_parameter=
 #extra_parameter="${extra_parameter} "
 
 exp_tag=
-train_config=st_train_ctc.yaml
+train_config=train_ctc.yaml
 
 cmd="./run.sh
     --stage 1

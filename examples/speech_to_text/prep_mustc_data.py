@@ -107,10 +107,15 @@ def process(args):
         if not cur_root.is_dir():
             print(f"{cur_root.as_posix()} does not exist. Skipped.")
             continue
+        if args.output_root is None:
+            output_root = cur_root
+        else:
+            output_root = Path(args.output_root).absolute() / f"en-{lang}"
+
         # Extract features
-        feature_root = cur_root / "fbank80"
+        feature_root = output_root / "fbank80"
         feature_root.mkdir(exist_ok=True)
-        zip_path = cur_root / "fbank80.zip"
+        zip_path = output_root / "fbank80.zip"
         if args.overwrite or not Path.exists(zip_path):
             for split in MUSTC.SPLITS:
                 print(f"Fetching split {split}...")
@@ -135,7 +140,7 @@ def process(args):
                 if split == 'train' and args.cmvn_type == "global":
                     # Estimate and save cmv
                     stats = cal_gcmvn_stats(gcmvn_feature_list)
-                    with open(cur_root / "gcmvn.npz", "wb") as f:
+                    with open(output_root / "gcmvn.npz", "wb") as f:
                         np.savez(f, mean=stats["mean"], std=stats["std"])
 
             # Pack features into ZIP
@@ -144,7 +149,7 @@ def process(args):
 
         gen_manifest_flag = False
         for split in MUSTC.SPLITS:
-            if not Path.exists(cur_root / f"{split}_{args.task}.tsv"):
+            if not Path.exists(output_root / f"{split}_{args.task}.tsv"):
                 gen_manifest_flag = True
                 break
 
@@ -183,7 +188,7 @@ def process(args):
                     train_text.extend(manifest["tgt_text"])
                 df = pd.DataFrame.from_dict(manifest)
                 df = filter_manifest_df(df, is_train_split=is_train_split)
-                save_df_to_tsv(df, cur_root / f"{split}_{args.task}.tsv")
+                save_df_to_tsv(df, output_root / f"{split}_{args.task}.tsv")
 
         # Generate vocab
         v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
@@ -215,7 +220,7 @@ def process(args):
                 f.write(t + "\n")
             gen_vocab(
                 Path(f.name),
-                cur_root / spm_filename_prefix,
+                output_root / spm_filename_prefix,
                 args.vocab_type,
                 args.vocab_size,
             )
@@ -225,13 +230,13 @@ def process(args):
             yaml_filename = f"config_{args.task}_share.yaml"
 
         gen_config_yaml(
-            cur_root,
+            output_root,
             spm_filename_prefix + ".model",
             yaml_filename=yaml_filename,
             specaugment_policy="lb",
             cmvn_type=args.cmvn_type,
             gcmvn_path=(
-                cur_root / "gcmvn.npz" if args.cmvn_type == "global"
+                output_root / "gcmvn.npz" if args.cmvn_type == "global"
                 else None
             ),
             asr_spm_filename=asr_spm_filename,
@@ -245,12 +250,17 @@ def process_joint(args):
     cur_root = Path(args.data_root)
     assert all((cur_root / f"en-{lang}").is_dir() for lang in MUSTC.LANGUAGES), \
         "do not have downloaded data available for all 8 languages"
+    if args.output_root is None:
+        output_root = cur_root
+    else:
+        output_root = Path(args.output_root).absolute()
+
     # Generate vocab
     vocab_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
     spm_filename_prefix = f"spm_{args.vocab_type}{vocab_size_str}_{args.task}"
     with NamedTemporaryFile(mode="w") as f:
         for lang in MUSTC.LANGUAGES:
-            tsv_path = cur_root / f"en-{lang}" / f"train_{args.task}.tsv"
+            tsv_path = output_root / f"en-{lang}" / f"train_{args.task}.tsv"
             df = load_df_from_tsv(tsv_path)
             for t in df["tgt_text"]:
                 f.write(t + "\n")
@@ -259,14 +269,14 @@ def process_joint(args):
             special_symbols = [f'<lang:{lang}>' for lang in MUSTC.LANGUAGES]
         gen_vocab(
             Path(f.name),
-            cur_root / spm_filename_prefix,
+            output_root / spm_filename_prefix,
             args.vocab_type,
             args.vocab_size,
             special_symbols=special_symbols
         )
     # Generate config YAML
     gen_config_yaml(
-        cur_root,
+        output_root,
         spm_filename_prefix + ".model",
         yaml_filename=f"config_{args.task}.yaml",
         specaugment_policy="ld",
@@ -275,8 +285,8 @@ def process_joint(args):
     # Make symbolic links to manifests
     for lang in MUSTC.LANGUAGES:
         for split in MUSTC.SPLITS:
-            src_path = cur_root / f"en-{lang}" / f"{split}_{args.task}.tsv"
-            desc_path = cur_root / f"{split}_{lang}_{args.task}.tsv"
+            src_path = output_root / f"en-{lang}" / f"{split}_{args.task}.tsv"
+            desc_path = output_root / f"{split}_{lang}_{args.task}.tsv"
             if not desc_path.is_symlink():
                 os.symlink(src_path, desc_path)
 
@@ -284,6 +294,7 @@ def process_joint(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", "-d", required=True, type=str)
+    parser.add_argument("--output-root", "-o", default=None, type=str)
     parser.add_argument(
         "--vocab-type",
         default="unigram",

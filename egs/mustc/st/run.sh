@@ -39,7 +39,8 @@ asr_vocab_size=5000
 vocab_size=10000
 share_dict=1
 
-data_dir=~/st/data/${dataset}
+org_data_dir=/media/data/${dataset}
+data_dir=~/st/data/${dataset}/st
 test_subset=(tst-COMMON)
 
 # exp
@@ -49,7 +50,7 @@ exp_tag=baseline
 exp_name=
 
 # config
-train_config=st_train_ctc.yaml
+train_config=train_ctc.yaml
 
 # training setting
 fp16=1
@@ -100,8 +101,13 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
     ### But you can utilize Kaldi recipes in most cases
     echo "stage 0: ASR Data Preparation"
+    if [[ ! -e ${data_dir} ]]; then
+        mkdir -p ${data_dir}
+    fi
+
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
-        --data-root ${data_dir}
+        --data-root ${org_data_dir}
+        --output-root ${data_dir}
         --task asr
         --vocab-type ${vocab_type}
         --vocab-size ${asr_vocab_size}"
@@ -110,7 +116,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     echo "stage 0: ST Data Preparation"
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
-        --data-root ${data_dir}
+        --data-root ${org_data_dir}
+        --output-root ${data_dir}
         --task st
         --add-src
         --cmvn-type utterance
@@ -127,6 +134,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
 fi
+
+data_dir=${data_dir}/${lang}
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     echo "stage 1: ST Network Training"
@@ -154,7 +163,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     cp ${train_config} ${model_dir}
 
     cmd="python3 -u ${root_dir}/fairseq_cli/train.py
-        ${data_dir}/$lang
+        ${data_dir}
         --config-yaml ${data_config}
         --train-config ${train_config}
         --task speech_to_text
@@ -263,7 +272,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	for subset in ${test_subset[@]}; do
         subset=${subset}_st
   		cmd="python ${root_dir}/fairseq_cli/generate.py
-        ${data_dir}/$lang
+        ${data_dir}
         --config-yaml ${data_config}
         --gen-subset ${subset}
         --task speech_to_text
