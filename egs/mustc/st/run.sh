@@ -90,7 +90,7 @@ if [[ -z ${exp_name} ]]; then
     fi
 fi
 
-model_dir=$root_dir/../checkpoints/$dataset/$task/st/${exp_name}
+model_dir=$root_dir/../checkpoints/$dataset/st/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
     echo "stage -1: Data Download"

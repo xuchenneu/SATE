@@ -255,9 +255,10 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	[[ -f ${result_file} ]] && rm ${result_file}
 
 	for subset in ${test_subset[@]}; do
-        subset=${subset}_st
   		cmd="python ${root_dir}/fairseq_cli/generate.py
-        ${data_dir}/$lang
+        ${data_dir}
+        --source-lang ${src_lang}
+        --target-lang ${tgt_lang}
         --config-yaml ${data_config}
         --gen-subset ${subset}
         --task ${task}
