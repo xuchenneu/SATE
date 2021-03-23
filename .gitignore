@@ -134,3 +134,4 @@ experimental/*
 
 # Weights and Biases logs
 wandb/
+/examples/translation/iwslt14.tokenized.de-en/
