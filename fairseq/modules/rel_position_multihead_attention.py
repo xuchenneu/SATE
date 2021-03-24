@@ -3,13 +3,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import math
 from typing import Dict, Optional, Tuple
 
 import torch
-import torch.nn.functional as F
 from fairseq import utils
-from fairseq.incremental_decoding_utils import with_incremental_state
 from fairseq.modules.multihead_attention import MultiheadAttention
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor, nn
@@ -67,7 +64,6 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         nn.init.xavier_normal_(self.pos_bias_u)
         nn.init.xavier_normal_(self.pos_bias_v)
 
-
     def forward(
         self,
         query,
@@ -107,41 +103,6 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         tgt_len, bsz, embed_dim = query.size()
         assert embed_dim == self.embed_dim
         assert list(query.size()) == [tgt_len, bsz, embed_dim]
-
-        if (
-            False and
-            not self.onnx_trace
-            and not is_tpu  # don't use PyTorch version on TPUs
-            and incremental_state is None
-            and not static_kv
-            # A workaround for quantization to work. Otherwise JIT compilation
-            # treats bias in linear module as method.
-            and not torch.jit.is_scripting()
-        ):
-            assert key is not None and value is not None
-            return F.multi_head_attention_forward(
-                query,
-                key,
-                value,
-                self.embed_dim,
-                self.num_heads,
-                torch.empty([0]),
-                torch.cat((self.q_proj.bias, self.k_proj.bias, self.v_proj.bias)),
-                self.bias_k,
-                self.bias_v,
-                self.add_zero_attn,
-                self.dropout_module.p,
-                self.out_proj.weight,
-                self.out_proj.bias,
-                self.training or self.dropout_module.apply_during_inference,
-                key_padding_mask,
-                need_weights,
-                attn_mask,
-                use_separate_proj_weight=True,
-                q_proj_weight=self.q_proj.weight,
-                k_proj_weight=self.k_proj.weight,
-                v_proj_weight=self.v_proj.weight,
-            )
 
         if incremental_state is not None:
             saved_state = self._get_input_buffer(incremental_state)
@@ -197,14 +158,19 @@ class RelPositionMultiheadAttention(MultiheadAttention):
         #     .view(tgt_len, bsz * self.num_heads, self.head_dim)
         #     .transpose(0, 1)
         # )
-        # prepare q for RPE  # (tgt_len, bsz, num_heads, head_dim)
-        q = q.contiguous().view(tgt_len, bsz, self.num_heads, self.head_dim)
+
+        # prepare q for RPE  # (bsz, tgt_len num_heads, head_dim)
+        q = q.contiguous().view(tgt_len, bsz, self.num_heads, self.head_dim).transpose(0, 1)
+
+        # k (bsz * num_heads, tgt_len, head_dim)
         if k is not None:
             k = (
                 k.contiguous()
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
+
+        # v (bsz * num_heads, tgt_len, head_dim)
         if v is not None:
             v = (
                 v.contiguous()
@@ -283,31 +249,32 @@ class RelPositionMultiheadAttention(MultiheadAttention):
                 )
 
         pos_emb = pos_emb.transpose(0, 1)
-        p_rep = self.linear_pos(pos_emb).view(bsz, -1, self.num_heads, self.head_dim)
-        p_rep = p_rep.transpose(1, 2).contiguous().view(bsz * self.num_heads, -1, self.head_dim)
+        p = self.linear_pos(pos_emb).view(bsz, -1, self.num_heads, self.head_dim)
+        # p (bsz * num_heads, tgt_len, head_dim)
+        p = p.transpose(1, 2).contiguous().view(bsz * self.num_heads, -1, self.head_dim)
 
         # (batch * head, time1, d_k)
         q_with_bias_u = (
-            (q + self.pos_bias_u).contiguous()
-            .view(tgt_len, bsz * self.num_heads, self.head_dim)
-            .transpose(0, 1)
+            (q + self.pos_bias_u).transpose(1, 2)
+            .contiguous()
+            .view(bsz * self.num_heads, tgt_len, self.head_dim)
         )
         # (batch * head, time1, d_k)
         q_with_bias_v = (
-            (q + self.pos_bias_v).contiguous()
-            .view(tgt_len, bsz * self.num_heads, self.head_dim)
-            .transpose(0, 1)
+            (q + self.pos_bias_v).transpose(0, 1)
+            .contiguous()
+            .view(bsz * self.num_heads, tgt_len, self.head_dim)
         )
 
         # compute attention score
         # first compute matrix a and matrix c
         # as described in https://arxiv.org/abs/1901.02860 Section 3.3
         # (batch * head, time1, time2)
-        matrix_ac = torch.bmm(q_with_bias_u, k.transpose(1, 2))
+        matrix_ac = torch.matmul(q_with_bias_u, k.transpose(1, 2))
 
         # compute matrix b and matrix d
         # (batch * head, time1, time2)
-        matrix_bd = torch.bmm(q_with_bias_v, p_rep.transpose(1, 2))
+        matrix_bd = torch.matmul(q_with_bias_v, p.transpose(1, 2))
 
         def rel_shift(x, zero_triu=False):
             """Compute relative positional encoding.
@@ -315,36 +282,30 @@ class RelPositionMultiheadAttention(MultiheadAttention):
             Args:
                 x (torch.Tensor): Input tensor (batch, head, time1, 2*time1-1).
                 time1 means the length of query vector.
+                zero_triu (bool): If true, return the lower triangular part of
+                the matrix.
             Returns:
                 torch.Tensor: Output tensor.
             """
 
-            zero_pad = torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype)
+            zero_pad = torch.zeros((x.size()[0], x.size()[1], 1),
+                                   device=x.device,
+                                   dtype=x.dtype)
             x_padded = torch.cat([zero_pad, x], dim=-1)
 
-            x_padded = x_padded.view(*x.size()[:2], x.size(3) + 1, x.size(2))
-            x = x_padded[:, :, 1:].view_as(x)
-
-            # zero_pad = torch.zeros((*x.size()[:3], 1), device=x.device, dtype=x.dtype)
-            # x_padded = torch.cat([zero_pad, x], dim=-1)
-            #
-            # x_padded = x_padded.view(*x.size()[:2], x.size(3) + 1, x.size(2))
-            # x = x_padded[:, :, 1:].view_as(x)[
-            #     :, :, :, : x.size(-1) // 2 + 1
-            # ]  # only keep the positions from 0 to time2
+            x_padded = x_padded.view(x.size()[0],
+                                     x.size()[2] + 1, x.size()[1])
+            x = x_padded[:, 1:].view_as(x)
 
             if zero_triu:
-                ones = torch.ones((x.size(2), x.size(3)), device=x.device)
-                x = x * torch.tril(ones, x.size(3) - x.size(2))[None, None, :, :]
+                ones = torch.ones((x.size(1), x.size(2)), device=x.device)
+                x = x * torch.tril(ones, x.size(2) - x.size(1))[None, :, :]
             return x
 
-        # matrix_bd = matrix_bd.contiguous().view(bsz, self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
-        # matrix_bd = rel_shift(
-        #     matrix_bd,
-        # ).contiguous().view(bsz * self.num_heads, matrix_bd.size(-2), matrix_bd.size(-1))
+        matrix_bd = rel_shift(matrix_bd)
+
         attn_weights = (matrix_ac + matrix_bd) * self.scaling
 
-        # attn_weights = torch.bmm(q, k.transpose(1, 2))
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]

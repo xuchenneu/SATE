@@ -307,8 +307,9 @@ class S2TTransformerEncoder(FairseqEncoder):
             [int(k) for k in args.conv_kernel_sizes.split(",")],
         )
 
+        self.attn_type = getattr(args, "encoder_attention_type", "selfattn")
         self.embed_positions = PositionalEmbedding(
-            args.max_source_positions, args.encoder_embed_dim, self.padding_idx
+            args.max_source_positions, args.encoder_embed_dim, self.padding_idx, pos_emb_type=self.attn_type
         )
 
         self.transformer_layers = nn.ModuleList(
@@ -319,7 +320,6 @@ class S2TTransformerEncoder(FairseqEncoder):
         else:
             self.layer_norm = None
 
-        self.attn_type = getattr(args, "encoder_attention_type", "selfattn")
         self.use_ctc = ("ctc" in getattr(args, "criterion", False)) and \
                        (getattr(args, "ctc_weight", False) > 0)
         if self.use_ctc:
@@ -348,6 +348,7 @@ class S2TTransformerEncoder(FairseqEncoder):
         if self.attn_type != "rel_selfattn":
             x += positions
         x = self.dropout_module(x)
+        positions = self.dropout_module(positions)
 
         for layer in self.transformer_layers:
             x = layer(x, encoder_padding_mask, pos_emb=positions)

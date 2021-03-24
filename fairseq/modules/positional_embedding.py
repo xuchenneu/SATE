@@ -6,7 +6,7 @@
 import torch.nn as nn
 
 from .learned_positional_embedding import LearnedPositionalEmbedding
-from .sinusoidal_positional_embedding import SinusoidalPositionalEmbedding
+from .sinusoidal_positional_embedding import SinusoidalPositionalEmbedding, RelPositionalEmbedding
 
 
 def PositionalEmbedding(
@@ -14,8 +14,9 @@ def PositionalEmbedding(
     embedding_dim: int,
     padding_idx: int,
     learned: bool = False,
+    pos_emb_type: str = None,
 ):
-    if learned:
+    if learned or pos_emb_type == "learned":
         # if padding_idx is specified then offset the embedding ids by
         # this index and adjust num_embeddings appropriately
         # TODO: The right place for this offset would be inside
@@ -26,6 +27,12 @@ def PositionalEmbedding(
         nn.init.normal_(m.weight, mean=0, std=embedding_dim ** -0.5)
         if padding_idx is not None:
             nn.init.constant_(m.weight[padding_idx], 0)
+    elif pos_emb_type is not None and pos_emb_type.startswith("debug"):
+        m = RelPositionalEmbedding(
+            embedding_dim,
+            padding_idx,
+            init_size=num_embeddings + padding_idx + 1,
+        )
     else:
         m = SinusoidalPositionalEmbedding(
             embedding_dim,

@@ -103,3 +103,37 @@ class SinusoidalPositionalEmbedding(nn.Module):
             .view(bsz, seq_len, -1)
             .detach()
         )
+
+
+class RelPositionalEmbedding(SinusoidalPositionalEmbedding):
+    """Relative positional encoding module.
+    See : Appendix B in https://arxiv.org/abs/1901.02860
+    Args:
+        d_model (int): Embedding dimension.
+        dropout_rate (float): Dropout rate.
+        max_len (int): Maximum input length.
+    """
+
+    def __init__(self, embedding_dim, padding_idx, init_size=1024):
+        super().__init__(embedding_dim, padding_idx, init_size)
+        self.max_size = init_size
+
+    def forward(
+            self,
+            input,
+            incremental_state: Optional[Any] = None,
+            timestep: Optional[Tensor] = None,
+            positions: Optional[Any] = None,
+            offset: int = 0
+    ):
+        """Compute positional encoding.
+        Args:
+            input (torch.Tensor): Input tensor (batch, time, `*`).
+        Returns:
+            torch.Tensor: Encoded tensor (batch, time, `*`).
+            torch.Tensor: Positional embedding tensor (1, time, `*`).
+        """
+        assert offset + input.size(1) < self.max_size
+        self.weights = self.weights.to(input.device)
+        pos_emb = self.weights[:, offset:offset + input.size(1)]
+        return pos_emb

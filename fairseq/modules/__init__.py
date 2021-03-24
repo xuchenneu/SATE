@@ -8,6 +8,7 @@ from .adaptive_input import AdaptiveInput
 from .adaptive_softmax import AdaptiveSoftmax
 from .beamable_mm import BeamableMM
 from .character_token_embedder import CharacterTokenEmbedder
+from .convolution import ConvolutionModule
 from .conv_tbc import ConvTBC
 from .cross_entropy import cross_entropy
 from .downsampled_multihead_attention import DownsampledMultiHeadAttention
@@ -36,12 +37,15 @@ from .transpose_last import TransposeLast
 from .unfold import unfold1d
 from .transformer_layer import TransformerDecoderLayer, TransformerEncoderLayer
 from .vggblock import VGGBlock
+from .conformer_layer import ConformerEncoderLayer
 
 __all__ = [
     "AdaptiveInput",
     "AdaptiveSoftmax",
     "BeamableMM",
     "CharacterTokenEmbedder",
+    "ConformerEncoderLayer",
+    "ConvolutionModule",
     "ConvTBC",
     "cross_entropy",
     "DownsampledMultiHeadAttention",
