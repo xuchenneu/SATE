@@ -9,7 +9,6 @@ import torch
 import torch.nn as nn
 from fairseq import utils
 from fairseq.modules import LayerNorm, MultiheadAttention, RelPositionMultiheadAttention, ConvolutionModule
-# from .layer_norm import LayerNorm
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
@@ -66,17 +65,17 @@ class ConformerEncoderLayer(nn.Module):
                 self.quant_noise_block_size,
             )
             self.macaron_norm = LayerNorm(self.embed_dim)
-            self.ff_scale = 0.5
+            self.ffn_scale = 0.5
         else:
             self.macaron_fc1 = None
             self.macaron_fc2 = None
             self.macaron_norm = None
-            self.ff_scale = 1.0
+            self.ffn_scale = 1.0
 
         if args.use_cnn_module:
             self.conv_norm = LayerNorm(self.embed_dim)
             self.conv_module = ConvolutionModule(self.embed_dim, args.cnn_module_kernel, self.activation_fn)
-            self.final_norm(self.embed_dim)
+            self.final_norm = LayerNorm(self.embed_dim)
         else:
             self.conv_norm = False
             self.conv_module = None
@@ -96,7 +95,7 @@ class ConformerEncoderLayer(nn.Module):
             self.quant_noise_block_size,
         )
 
-        self.ff_norm = LayerNorm(self.embed_dim)
+        self.ffn_norm = LayerNorm(self.embed_dim)
 
     def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
         return quant_noise(
@@ -178,7 +177,7 @@ class ConformerEncoderLayer(nn.Module):
             if self.normalize_before:
                 x = self.macaron_norm(x)
             x = self.macaron_fc2(self.activation_dropout_module(self.activation_fn(self.macaron_fc1(x))))
-            x = residual + self.ff_scale * self.dropout_module(x)
+            x = residual + self.ffn_scale * self.dropout_module(x)
             if not self.normalize_before:
                 x = self.macaron_norm(x)
 
@@ -214,23 +213,23 @@ class ConformerEncoderLayer(nn.Module):
         if self.conv_module is not None:
             residual = x
             if self.normalize_before:
-                x = self.norm_conv(x)
+                x = self.conv_norm(x)
             x = residual + self.dropout_module(self.conv_module(x))
             if not self.normalize_before:
-                x = self.norm_conv(x)
+                x = self.conv_norm(x)
 
         residual = x
         if self.normalize_before:
-            x = self.ff_norm(x)
+            x = self.ffn_norm(x)
         x = self.activation_fn(self.fc1(x))
         x = self.activation_dropout_module(x)
         x = self.fc2(x)
         x = self.dropout_module(x)
-        x = self.residual_connection(x, residual)
+        x = self.residual_connection(self.ffn_scale * x, residual)
         if not self.normalize_before:
-            x = self.ff_norm(x)
+            x = self.ffn_norm(x)
 
         if self.conv_module is not None:
-            x = self.norm_final(x)
+            x = self.final_norm(x)
 
         return x
