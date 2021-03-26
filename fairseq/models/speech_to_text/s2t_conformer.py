@@ -130,8 +130,8 @@ def base_architecture(args):
     args.conv_channels = getattr(args, "conv_channels", 1024)
     # Conformer
     args.macaron_style = getattr(args, "macaron_style", True)
-    args.macaron_style = getattr(args, "use_cnn_module", True)
-    args.macaron_style = getattr(args, "cnn_module_kernel", 31)
+    args.use_cnn_module = getattr(args, "use_cnn_module", True)
+    args.cnn_module_kernel = getattr(args, "cnn_module_kernel", 31)
 
     args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 512)
     args.encoder_ffn_embed_dim = getattr(args, "encoder_ffn_embed_dim", 2048)
