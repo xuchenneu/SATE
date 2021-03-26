@@ -211,12 +211,14 @@ class ConformerEncoderLayer(nn.Module):
 
         # convolution module
         if self.conv_module is not None:
+            x = x.transpose(0, 1)
             residual = x
             if self.normalize_before:
                 x = self.conv_norm(x)
             x = residual + self.dropout_module(self.conv_module(x))
             if not self.normalize_before:
                 x = self.conv_norm(x)
+            x = x.transpose(0, 1)
 
         residual = x
         if self.normalize_before:
