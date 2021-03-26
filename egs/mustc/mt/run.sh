@@ -24,7 +24,7 @@ device=()
 gpu_num=8
 update_freq=1
 
-root_dir=~/st/fairseq
+root_dir=~/st/Fairseq-S2T
 pwd_dir=$PWD
 
 # dataset
@@ -53,7 +53,7 @@ train_config=st_train_ctc.yaml
 
 # training setting
 fp16=1
-max_tokens=40000
+max_tokens=4096
 step_valid=0
 bleu_valid=0
 

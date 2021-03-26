@@ -24,7 +24,7 @@ device=()
 gpu_num=8
 update_freq=1
 
-root_dir=~/st/fairseq
+root_dir=~/st/Fairseq-S2T
 pwd_dir=$PWD
 
 # dataset
@@ -101,8 +101,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
     ### But you can utilize Kaldi recipes in most cases
     echo "stage 0: ASR Data Preparation"
-    if [[ ! -e ${data_dir} ]]; then
-        mkdir -p ${data_dir}
+    if [[ ! -e ${data_dir}/${lang} ]]; then
+        mkdir -p ${data_dir}/${lang}
     fi
 
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
@@ -166,7 +166,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         ${data_dir}
         --config-yaml ${data_config}
         --train-config ${train_config}
-        --task speech_to_text
+        --task ${task}
         --max-tokens ${max_tokens}
         --update-freq ${update_freq}
         --log-interval 100

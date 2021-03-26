@@ -1,7 +1,7 @@
 train-subset: train_st
 valid-subset: dev_st
 
-max-epoch: 100
+max-epoch: 50
 max-update: 100000
 
 num-workers: 8
@@ -34,7 +34,7 @@ dropout: 0.1
 activation-fn: relu
 encoder-embed-dim: 256
 encoder-ffn-embed-dim: 2048
-encoder-layers: 12
+encoder-layers: 6
 decoder-layers: 6
 encoder-attention-heads: 4
 

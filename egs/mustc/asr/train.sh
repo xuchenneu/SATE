@@ -3,8 +3,8 @@
 # training the model
 
 gpu_num=8
-update_freq=1
-max_tokens=40000
+update_freq=2
+max_tokens=20000
 
 extra_tag=
 extra_parameter=
@@ -13,7 +13,7 @@ extra_parameter=
 #extra_parameter="${extra_parameter} "
 
 exp_tag=
-train_config=asr_train_ctc.yaml
+train_config=train_ctc.yaml
 
 cmd="./run.sh
     --stage 1

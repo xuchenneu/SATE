@@ -24,7 +24,7 @@ device=()
 gpu_num=8
 update_freq=1
 
-root_dir=~/st/fairseq
+root_dir=~/st/Fairseq-S2T
 pwd_dir=$PWD
 
 # dataset
