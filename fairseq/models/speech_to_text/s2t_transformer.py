@@ -240,7 +240,16 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
 
     @classmethod
     def build_decoder(cls, args, task, embed_tokens):
-        return TransformerDecoderScriptable(args, task.target_dictionary, embed_tokens)
+        decoder = TransformerDecoderScriptable(args, task.target_dictionary, embed_tokens)
+        if getattr(args, "load_pretrained_decoder_from", None):
+            decoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=decoder, checkpoint=args.load_pretrained_encoder_from
+            )
+            logger.info(
+                f"loaded pretrained decoder from: "
+                f"{args.load_pretrained_decoder_from}"
+            )
+        return decoder
 
     @classmethod
     def build_model(cls, args, task):
