@@ -1,27 +1,25 @@
-train-subset: train_asr
-valid-subset: dev_asr
+#train-subset: train-clean-100,train-clean-360,train-other-500
+train-subset: train-clean-100
+valid-subset: dev-clean
 
-max-epoch: 50
-max-update: 100000
+max-epoch: 100
+max-update: 300000
 
-num-workers: 8
+num-workers: 0
 patience: 10
 no-progress-bar: True
 log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-params: 
-#load-pretrained-encoder-from: 
-
-arch: s2t_transformer_s
+arch: s2t_conformer_s
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
 lr-scheduler: inverse_sqrt
 warmup-init-lr: 1e-7
 warmup-updates: 10000
-lr: 1e-3
+lr: 2e-3
 #adam_betas: (0.9,0.98)
 
 ctc-weight: 0.3
@@ -34,9 +32,13 @@ dropout: 0.1
 activation-fn: relu
 encoder-embed-dim: 256
 encoder-ffn-embed-dim: 2048
-encoder-layers: 12
-decoder-layers: 6
+encoder-layers: 3
+decoder-layers: 3
 encoder-attention-heads: 4
+
+macaron-style: True
+use-cnn-module: True
+cnn-module-kernel: 31
 
 #decoder-embed-dim: 256
 #decoder-ffn-embed-dim: 2048

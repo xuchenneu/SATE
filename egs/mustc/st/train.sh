@@ -3,8 +3,8 @@
 # training the model
 
 gpu_num=8
-update_freq=1
-max_tokens=40000
+update_freq=2
+max_tokens=20000
 
 extra_tag=
 extra_parameter=

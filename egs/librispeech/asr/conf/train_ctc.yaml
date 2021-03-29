@@ -1,18 +1,18 @@
-#train-subset: train-clean-100,train-clean-360,train-other-500
-train-subset: train-clean-100
+train-subset: train-clean-100,train-clean-360,train-other-500
+#train-subset: train-clean-100
 valid-subset: dev-clean
 
 max-epoch: 100
 max-update: 300000
 
-num-workers: 0
+num-workers: 8
 patience: 10
 no-progress-bar: True
 log-interval: 100
 seed: 1
 report-accuracy: True
 
-arch: s2t_transformer_s
+arch: s2t_conformer_s
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0

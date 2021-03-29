@@ -38,8 +38,8 @@ encoder-layers: 6
 decoder-layers: 6
 encoder-attention-heads: 4
 
-macaron-style: true
-use-cnn-module: true
+macaron-style: True
+use-cnn-module: True
 cnn-module-kernel: 31
 
 #decoder-embed-dim: 256

@@ -24,7 +24,7 @@ device=()
 gpu_num=8
 update_freq=1
 
-root_dir=~/Code/st/fairseq
+root_dir=~/st/Fairseq-S2T
 pwd_dir=$PWD
 
 # dataset
@@ -36,7 +36,8 @@ task=speech_to_text
 vocab_type=unigram
 vocab_size=10000
 
-data_dir=~/Code/st/data/${dataset}
+org_data_dir=/meida/data/${dataset}
+data_dir=~/st/data/${dataset}
 test_subset=(dev-clean dev-other test-clean test-other)
 
 # exp
@@ -46,11 +47,11 @@ exp_tag=baseline
 exp_name=
 
 # config
-train_config=asr_train_ctc.yaml
+train_config=train_ctc.yaml
 data_config=config.yaml
 
 # training setting
-fp16=0
+fp16=1
 max_tokens=40000
 step_valid=0
 
@@ -80,7 +81,7 @@ if [[ -z ${exp_name} ]]; then
     fi
 fi
 
-model_dir=$root_dir/../checkpoints/$dataset/$task/asr/${exp_name}
+model_dir=$root_dir/../checkpoints/$dataset/asr/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
     echo "stage -1: Data Download"
@@ -92,7 +93,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### But you can utilize Kaldi recipes in most cases
     echo "stage 0: Data Preparation"
     cmd="python ${root_dir}/examples/speech_to_text/prep_librispeech_data.py
-        --output-root ${data_dir} 
+        --data-root ${org_data_dir}
+        --output-root ${data_dir}
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
@@ -101,7 +103,7 @@ fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     echo "stage 1: ASR Network Training"
-    [[ ! -d $data_dir ]] && echo "The data dir $data_dir is not existing!" && exit 1;
+    [[ ! -d ${data_dir} ]] && echo "The data dir $data_dir is not existing!" && exit 1;
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
 		if [[ ${gpu_num} -eq 0 ]]; then
@@ -112,7 +114,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
 		fi
     fi
 
-    echo -e "dev=${device} data=$data_dir model=${model_dir}"
+    echo -e "dev=${device} data=${data_dir} model=${model_dir}"
 
     if [[ ! -d ${model_dir} ]]; then
         mkdir -p ${model_dir}
@@ -125,10 +127,10 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     cp ${train_config} ${model_dir}
 
     cmd="python3 -u ${root_dir}/fairseq_cli/train.py
-        $data_dir
-		--config-yaml ${data_config}
+        ${data_dir}
+        --config-yaml ${data_config}
         --train-config ${train_config}
-        --task speech_to_text
+        --task ${task}
         --max-tokens ${max_tokens}
         --update-freq ${update_freq}
         --log-interval 100
@@ -177,7 +179,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
 
     # save info
     log=./history.log
-    echo "${time} | ${device} | $data_dir | ${model_dir} " >> $log
+    echo "${time} | ${device} | ${data_dir} | ${model_dir} " >> $log
     cat $log | tail -n 50 > tmp.log
     mv tmp.log $log
     export CUDA_VISIBLE_DEVICES=${device}
@@ -225,7 +227,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	for subset in ${test_subset[@]}; do
         subset=${subset}
   		cmd="python ${root_dir}/fairseq_cli/generate.py
-        ${data_dir}/$lang
+        ${data_dir}
         --config-yaml ${data_config}
         --gen-subset ${subset}
         --task speech_to_text
