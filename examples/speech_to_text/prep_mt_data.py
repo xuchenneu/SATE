@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 
 MANIFEST_COLUMNS = ["src_text", "tgt_text"]
 
+
 class MTData(Dataset):
     """
     Create a Dataset for MuST-C. Each item is a tuple of the form:
@@ -34,8 +35,8 @@ class MTData(Dataset):
 
     def __init__(self, root: str, src_lang, tgt_lang: str, split: str) -> None:
         _root = Path(root) / f"{src_lang}-{tgt_lang}" / "data" / split
-        txt_root = _root / "txt"
-        assert _root.is_dir() and txt_root.is_dir()
+        txt_root = _root
+        assert _root.is_dir() and txt_root.is_dir(), (_root, txt_root)
         # Load source and target text
         self.data = []
         for _lang in [src_lang, tgt_lang]:
@@ -83,8 +84,6 @@ def process(args):
         if is_train_split:
             src_train_text.extend(manifest["src_text"])
             tgt_train_text.extend(manifest["tgt_text"])
-        df = pd.DataFrame.from_dict(manifest)
-        save_df_to_tsv(df, output_root / f"{split}.tsv")
 
     # Generate vocab and yaml
     v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)

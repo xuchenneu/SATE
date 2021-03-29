@@ -28,22 +28,22 @@ root_dir=~/st/Fairseq-S2T
 pwd_dir=$PWD
 
 # dataset
-src_lang=en
-tgt_lang=de
+src_lang=swa
+tgt_lang=en
 lang=${src_lang}-${tgt_lang}
 
-dataset=mustc
+dataset=lower
 task=translation
 vocab_type=unigram
-vocab_size=10000
+vocab_size=32000
 share_dict=1
 
-org_data_dir=/media/data/${dataset}
+org_data_dir=/media/data/${dataset}/mt
 data_dir=~/st/data/${dataset}/mt/${lang}
 train_prefix=train
 valid_prefix=dev
-test_prefix=tst-COMMON
-test_subset=(tst-COMMON)
+test_prefix=test
+test_subset=(test)
 
 # exp
 extra_tag=
@@ -135,7 +135,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
         [[ $eval -eq 1 ]] && eval ${cmd}
-
+    
         cmd="spm_encode
         --model ${data_dir}/${tgt_vocab_prefix}.model
         --output_format=piece
@@ -146,11 +146,11 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         [[ $eval -eq 1 ]] && eval ${cmd}
     done
 
-    cmd="python ${root_dir}/fairseq_cli/preprocess.py
+    cmd="python ${root_dir}/fairseq_cli/preprocess.py 
         --source-lang ${src_lang} --target-lang ${tgt_lang}
-        --trainpref ${data_dir}/data/train/${train_prefix}
-        --validpref ${data_dir}/data/dev/${valid_prefix}
-        --testpref ${data_dir}/data/test/${test_prefix}
+        --trainpref ${data_dir}/data/${train_prefix}
+        --validpref ${data_dir}/data/${valid_prefix}
+        --testpref ${data_dir}/data/${test_prefix}
         --destdir ${data_dir}/data-bin
         --srcdict ${data_dir}/${src_vocab_prefix}.txt
         --tgtdict ${data_dir}/${tgt_vocab_prefix}.txt
