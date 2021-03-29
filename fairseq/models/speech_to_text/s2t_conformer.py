@@ -96,6 +96,8 @@ class S2TConformerEncoder(S2TTransformerEncoder):
             [ConformerEncoderLayer(args) for _ in range(args.encoder_layers)]
         )
 
+        del self.transformer_layers
+
     def forward(self, src_tokens, src_lengths):
         x, input_lengths = self.subsample(src_tokens, src_lengths)
         x = self.embed_scale * x

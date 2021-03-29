@@ -215,7 +215,7 @@ class ConformerEncoderLayer(nn.Module):
             residual = x
             if self.normalize_before:
                 x = self.conv_norm(x)
-            x = residual + self.dropout_module(self.conv_module(x))
+            x = residual + self.dropout_module(self.conv_module(x, encoder_padding_mask))
             if not self.normalize_before:
                 x = self.conv_norm(x)
             x = x.transpose(0, 1)
