@@ -81,7 +81,6 @@ def _main(cfg: DictConfig, output_file):
     # Load dataset splits
     task = tasks.setup_task(cfg.task)
 
-
     # Set dictionaries
     try:
         src_dict = getattr(task, "source_dictionary", None)

@@ -41,6 +41,7 @@ share_dict=1
 
 org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/st
+data_dir=~/st/data/${dataset}/st_perturb_2
 test_subset=(tst-COMMON)
 
 # exp
@@ -104,6 +105,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     if [[ ! -e ${data_dir}/${lang} ]]; then
         mkdir -p ${data_dir}/${lang}
     fi
+    source audio/bin/activate
 
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
         --data-root ${org_data_dir}
@@ -118,6 +120,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
         --data-root ${org_data_dir}
         --output-root ${data_dir}
+        --speed-perturb
         --task st
         --add-src
         --cmvn-type utterance
@@ -133,6 +136,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
+    deactivate
 fi
 
 data_dir=${data_dir}/${lang}
