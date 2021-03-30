@@ -11,8 +11,9 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-params: 
-#load-pretrained-encoder-from: 
+# load-params:
+load-pretrained-encoder-from:
+load-pretrained-decoder-from:
 
 arch: s2t_transformer_s
 share-decoder-input-output-embed: True

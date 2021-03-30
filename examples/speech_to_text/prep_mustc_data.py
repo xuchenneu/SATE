@@ -46,7 +46,8 @@ class MUSTC(Dataset):
     utterance_id
     """
 
-    SPLITS = ["dev", "tst-COMMON", "tst-HE", "train"]
+    # SPLITS = ["dev", "tst-COMMON", "tst-HE", "train"]
+    SPLITS = ["train_debug", "dev"]
     LANGUAGES = ["de", "es", "fr", "it", "nl", "pt", "ro", "ru"]
 
     def __init__(self, root: str, lang: str, split: str, speed_perturb: bool = False) -> None:
@@ -74,8 +75,10 @@ class MUSTC(Dataset):
         self.data = []
         for wav_filename, _seg_group in groupby(segments, lambda x: x["wav"]):
             wav_path = wav_root / wav_filename
-            # sample_rate = torchaudio.info(wav_path.as_posix())[0].rate
-            sample_rate = torchaudio.info(wav_path.as_posix()).sample_rate
+            try:
+                sample_rate = torchaudio.info(wav_path.as_posix())[0].rate
+            except TypeError:
+                sample_rate = torchaudio.info(wav_path.as_posix()).sample_rate
             seg_group = sorted(_seg_group, key=lambda x: x["offset"])
             for i, segment in enumerate(seg_group):
                 offset = int(float(segment["offset"]) * sample_rate)
@@ -158,21 +161,28 @@ def process(args):
             output_root = Path(args.output_root).absolute() / f"en-{lang}"
 
         # Extract features
-        feature_root = output_root / "fbank80"
+        if args.speed_perturb:
+            feature_root = output_root / "fbank80_sp"
+        else:
+            feature_root = output_root / "fbank80"
         feature_root.mkdir(exist_ok=True)
-        zip_path = output_root / "fbank80.zip"
-        manifest_dict = {}
-        train_text = []
+        if args.speed_perturb:
+            zip_path = output_root / "fbank80_sp.zip"
+        else:
+            zip_path = output_root / "fbank80.zip"
+        frame_path = output_root / "frame.pkl"
+        frame_dict = {}
+        index = 0
 
         gen_feature_flag = False
         if not Path.exists(zip_path):
             gen_feature_flag = True
-        for split in MUSTC.SPLITS:
-            if not Path.exists(output_root / f"{split}_{args.task}.tsv"):
-                gen_feature_flag = True
-                break
 
-        if args.overwrite or gen_feature_flag:
+        gen_frame_flag = False
+        if not Path.exists(frame_path):
+            gen_frame_flag = True
+
+        if args.overwrite or gen_feature_flag or gen_frame_flag:
             for split in MUSTC.SPLITS:
                 print(f"Fetching split {split}...")
                 dataset = MUSTC(root.as_posix(), lang, split, args.speed_perturb)
@@ -182,25 +192,65 @@ def process(args):
                     print("And estimating cepstral mean and variance stats...")
                     gcmvn_feature_list = []
 
+                for items in tqdm(dataset):
+                    for item in items:
+                        index += 1
+                        waveform, sr, _, _, _, utt_id = item
+
+                        frame_dict[utt_id] = waveform.size(1)
+                        if gen_feature_flag:
+                            features_path = (feature_root / f"{utt_id}.npy").as_posix()
+                            features = extract_fbank_features(waveform, sr, Path(features_path))
+
+                            if split == 'train' and args.cmvn_type == "global" and not utt_id.startswith("sp"):
+                                if len(gcmvn_feature_list) < args.gcmvn_max_num:
+                                    gcmvn_feature_list.append(features)
+
+                    if is_train_split and args.size != -1 and index > args.size:
+                        break
+
+                if is_train_split and args.cmvn_type == "global":
+                    # Estimate and save cmv
+                    stats = cal_gcmvn_stats(gcmvn_feature_list)
+                    with open(output_root / "gcmvn.npz", "wb") as f:
+                        np.savez(f, mean=stats["mean"], std=stats["std"])
+
+        with open(frame_path, "wb") as f:
+            pickle.dump(frame_dict, f)
+
+        # Pack features into ZIP
+        print("ZIPing features...")
+        create_zip(feature_root, zip_path)
+
+        gen_manifest_flag = False
+        for split in MUSTC.SPLITS:
+            if not Path.exists(output_root / f"{split}_{args.task}.tsv"):
+                gen_manifest_flag = True
+                break
+
+        train_text = []
+        if args.overwrite or gen_manifest_flag:
+            if len(frame_dict) == 0:
+                with open(frame_path, "rb") as f:
+                    frame_dict = pickle.load(f)
+
+            print("Fetching ZIP manifest...")
+            zip_manifest = get_zip_manifest(zip_path)
+            # Generate TSV manifest
+            print("Generating manifest...")
+            for split in MUSTC.SPLITS:
+                is_train_split = split.startswith("train")
                 manifest = {c: [] for c in MANIFEST_COLUMNS}
                 if args.task == "st" and args.add_src:
                     manifest["src_text"] = []
-
-                for items in tqdm(dataset):
+                dataset = MUSTC(args.data_root, lang, split)
+                for idx in range(len(dataset)):
+                    items = dataset.get_fast(idx)
                     for item in items:
-                        # waveform, sample_rate, _, _, _, utt_id = item
-                        waveform, sr, src_utt, tgt_utt, speaker_id, utt_id = item
-
-                        features_path = (feature_root / f"{utt_id}.npy").as_posix()
-                        features = extract_fbank_features(waveform, sr, Path(features_path))
-                        # np.save(
-                        #     (feature_root / f"{utt_id}.npy").as_posix(),
-                        #     features
-                        # )
-
+                        _, sr, src_utt, tgt_utt, speaker_id, utt_id = item
                         manifest["id"].append(utt_id)
-                        duration_ms = int(waveform.size(1) / sr * 1000)
-                        # duration_ms = int(time_dict[utt_id] / sr * 1000)
+                        manifest["audio"].append(zip_manifest[utt_id])
+                        duration_ms = int(frame_dict[utt_id] / sr * 1000)
                         manifest["n_frames"].append(int(1 + (duration_ms - 25) / 10))
                         if args.lowercase_src:
                             src_utt = src_utt.lower()
@@ -212,49 +262,12 @@ def process(args):
                             manifest["src_text"].append(src_utt)
                         manifest["speaker"].append(speaker_id)
 
-                        if split == 'train' and args.cmvn_type == "global" and not utt_id.startswith("sp"):
-                            if len(gcmvn_feature_list) < args.gcmvn_max_num:
-                                gcmvn_feature_list.append(features)
-
                     if is_train_split and args.size != -1 and len(manifest["id"]) > args.size:
                         break
-
                 if is_train_split:
                     if args.task == "st" and args.add_src and args.share:
-                        train_text.extend(list(set(tuple(manifest["src_text"]))))
-                    train_text.extend(dataset.get_tgt_text())
-
-                if is_train_split and args.cmvn_type == "global":
-                    # Estimate and save cmv
-                    stats = cal_gcmvn_stats(gcmvn_feature_list)
-                    with open(output_root / "gcmvn.npz", "wb") as f:
-                        np.savez(f, mean=stats["mean"], std=stats["std"])
-
-                manifest_dict[split] = manifest
-
-            # Pack features into ZIP
-            print("ZIPing features...")
-            create_zip(feature_root, zip_path)
-
-        gen_manifest_flag = False
-        for split in MUSTC.SPLITS:
-            if not Path.exists(output_root / f"{split}_{args.task}.tsv"):
-                gen_manifest_flag = True
-                break
-
-        train_text = []
-        if args.overwrite or gen_manifest_flag:
-            print("Fetching ZIP manifest...")
-            zip_manifest = get_zip_manifest(zip_path)
-            # Generate TSV manifest
-            print("Generating manifest...")
-
-            for split, manifest in manifest_dict.items():
-                is_train_split = split.startswith("train")
-
-                for utt_id in manifest["id"]:
-                    manifest["audio"].append(zip_manifest[utt_id])
-
+                        train_text.extend(manifest["src_text"])
+                    train_text.extend(manifest["tgt_text"])
                 df = pd.DataFrame.from_dict(manifest)
                 df = filter_manifest_df(df, is_train_split=is_train_split)
                 save_df_to_tsv(df, output_root / f"{split}_{args.task}.tsv")
@@ -316,7 +329,7 @@ def process(args):
         )
 
         # Clean up
-        # shutil.rmtree(feature_root)
+        shutil.rmtree(feature_root)
 
 
 def process_joint(args):

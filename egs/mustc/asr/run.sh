@@ -36,6 +36,7 @@ dataset=mustc
 task=speech_to_text
 vocab_type=unigram
 vocab_size=5000
+speed_perturb=1
 
 org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/asr
@@ -80,8 +81,14 @@ if [[ -z ${exp_name} ]]; then
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        exp_name=sp_${exp_name}
+    fi
 fi
 
+if [[ ${speed_perturb} -eq 1 ]]; then
+    data_dir=${data_dir}_sp
+fi
 model_dir=$root_dir/../checkpoints/$dataset/asr/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
@@ -96,6 +103,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     if [[ ! -e ${data_dir}/${lang} ]]; then
         mkdir -p ${data_dir}/${lang}
     fi
+    source ~/tools/audio/bin/activate
 
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
         --data-root ${org_data_dir}
@@ -103,6 +111,10 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --task asr
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        cmd="$cmd
+        --speed-perturb"
+    fi
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval $cmd
 fi
@@ -138,7 +150,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         ${data_dir}
         --config-yaml ${data_config}
         --train-config ${train_config}
-        --task speech_to_text
+        --task ${task}
         --max-tokens ${max_tokens}
         --update-freq ${update_freq}
         --log-interval 100
