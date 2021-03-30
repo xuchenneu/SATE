@@ -93,8 +93,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
     ### But you can utilize Kaldi recipes in most cases
     echo "stage 0: ASR Data Preparation"
-    if [[ ! -e ${data_dir} ]]; then
-        mkdir -p ${data_dir}
+    if [[ ! -e ${data_dir}/${lang} ]]; then
+        mkdir -p ${data_dir}/${lang}
     fi
 
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py

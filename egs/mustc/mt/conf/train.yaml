@@ -1,5 +1,5 @@
 train-subset: train
-valid-subset: dev
+valid-subset: valid
 
 max-epoch: 50
 max-update: 100000

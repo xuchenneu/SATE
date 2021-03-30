@@ -12,7 +12,7 @@ extra_parameter=
 #extra_tag="${extra_tag}"
 #extra_parameter="${extra_parameter} "
 
-exp_tag=baseline_997
+exp_tag=baseline
 train_config=train.yaml
 
 cmd="./run.sh

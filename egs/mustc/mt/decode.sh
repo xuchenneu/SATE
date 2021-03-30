@@ -2,7 +2,7 @@
 
 gpu_num=1
 
-test_subset=(tst-COMMON)
+test_subset=(test)
 
 exp_name=
 if [ "$#" -eq 1 ]; then

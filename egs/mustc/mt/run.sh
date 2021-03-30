@@ -43,7 +43,7 @@ data_dir=~/st/data/${dataset}/mt/${lang}
 train_prefix=train
 valid_prefix=dev
 test_prefix=tst-COMMON
-test_subset=(tst-COMMON)
+test_subset=(test)
 
 # exp
 extra_tag=
@@ -148,9 +148,9 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     cmd="python ${root_dir}/fairseq_cli/preprocess.py
         --source-lang ${src_lang} --target-lang ${tgt_lang}
-        --trainpref ${data_dir}/data/train/${train_prefix}
-        --validpref ${data_dir}/data/dev/${valid_prefix}
-        --testpref ${data_dir}/data/test/${test_prefix}
+        --trainpref ${data_dir}/data/${train_prefix}
+        --validpref ${data_dir}/data/${valid_prefix}
+        --testpref ${data_dir}/data/${test_prefix}
         --destdir ${data_dir}/data-bin
         --srcdict ${data_dir}/${src_vocab_prefix}.txt
         --tgtdict ${data_dir}/${tgt_vocab_prefix}.txt
