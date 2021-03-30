@@ -10,14 +10,14 @@ Fairseq_ST基于原始的Fairseq，提高了程序易用性以及对语音到文
 - 通过读取yaml配置文件进行训练
 - 支持ctc多任务学习
 - 使用ST相似的流程训练MT模型（在线分词）
+- 速度扰动 (需要torchaudio ≥ 0.8.0)
+- MT pipeline(bin)
+- Conformer模型结构
+- 预训练模型加载
 
 后续目标：
 
-- 速度扰动
-- MT pipeline(bin)
 - 相对位置表示
-- Conformer模型结构
-- 预训练模型加载
 - SATE模型结构
 
 # 需求条件
