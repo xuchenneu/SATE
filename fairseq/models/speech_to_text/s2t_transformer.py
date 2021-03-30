@@ -223,6 +223,12 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             metavar="STR",
             help="model to take encoder weights from (for initialization)",
         )
+        parser.add_argument(
+            "--load-pretrained-decoder-from",
+            type=str,
+            metavar="STR",
+            help="model to take decoder weights from (for initialization)",
+        )
         pass
 
     @classmethod
@@ -230,7 +236,7 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
         encoder = S2TTransformerEncoder(args, task, embed_tokens)
         if getattr(args, "load_pretrained_encoder_from", None):
             encoder = checkpoint_utils.load_pretrained_component_from_model(
-                component=encoder, checkpoint=args.load_pretrained_encoder_from
+                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
             )
             logger.info(
                 f"loaded pretrained encoder from: "
@@ -243,7 +249,7 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
         decoder = TransformerDecoderScriptable(args, task.target_dictionary, embed_tokens)
         if getattr(args, "load_pretrained_decoder_from", None):
             decoder = checkpoint_utils.load_pretrained_component_from_model(
-                component=decoder, checkpoint=args.load_pretrained_encoder_from
+                component=decoder, checkpoint=args.load_pretrained_encoder_from, strict=False
             )
             logger.info(
                 f"loaded pretrained decoder from: "

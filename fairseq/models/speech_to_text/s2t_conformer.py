@@ -76,7 +76,7 @@ class S2TConformerModel(S2TTransformerModel):
         encoder = S2TConformerEncoder(args, task, embed_tokens)
         if getattr(args, "load_pretrained_encoder_from", None):
             encoder = checkpoint_utils.load_pretrained_component_from_model(
-                component=encoder, checkpoint=args.load_pretrained_encoder_from
+                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
             )
             logger.info(
                 f"loaded pretrained encoder from: "
