@@ -46,8 +46,8 @@ class MUSTC(Dataset):
     utterance_id
     """
 
-    # SPLITS = ["dev", "tst-COMMON", "tst-HE", "train"]
-    SPLITS = ["train_debug", "dev"]
+    SPLITS = ["dev", "tst-COMMON", "tst-HE", "train"]
+    # SPLITS = ["train_debug", "dev"]
     LANGUAGES = ["de", "es", "fr", "it", "nl", "pt", "ro", "ru"]
 
     def __init__(self, root: str, lang: str, split: str, speed_perturb: bool = False) -> None:
