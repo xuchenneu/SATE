@@ -35,8 +35,9 @@ dataset=librispeech
 task=speech_to_text
 vocab_type=unigram
 vocab_size=10000
+speed_perturb=0
 
-org_data_dir=/meida/data/${dataset}
+org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}
 test_subset=(dev-clean dev-other test-clean test-other)
 
@@ -79,8 +80,14 @@ if [[ -z ${exp_name} ]]; then
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        exp_name=sp_${exp_name}
+    fi
 fi
 
+if [[ ${speed_perturb} -eq 1 ]]; then
+    data_dir=${data_dir}_sp
+fi
 model_dir=$root_dir/../checkpoints/$dataset/asr/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
@@ -92,18 +99,28 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
     ### But you can utilize Kaldi recipes in most cases
     echo "stage 0: Data Preparation"
+
+    if [[ ! -e ${data_dir} ]]; then
+        mkdir -p ${data_dir}
+    fi
+    source ~/tools/audio/bin/activate
+
     cmd="python ${root_dir}/examples/speech_to_text/prep_librispeech_data.py
         --data-root ${org_data_dir}
         --output-root ${data_dir}
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        cmd="$cmd
+        --speed-perturb"
+    fi
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval $cmd
 fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     echo "stage 1: ASR Network Training"
-    [[ ! -d ${data_dir} ]] && echo "The data dir $data_dir is not existing!" && exit 1;
+    [[ ! -d ${data_dir} ]] && echo "The data dir ${data_dir} is not existing!" && exit 1;
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
 		if [[ ${gpu_num} -eq 0 ]]; then

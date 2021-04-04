@@ -39,6 +39,7 @@ MANIFEST_COLUMNS = ["id", "audio", "n_frames", "tgt_text", "speaker"]
 
 
 def process(args):
+    data_root = Path(args.data_root).absolute()
     out_root = Path(args.output_root).absolute()
     out_root.mkdir(exist_ok=True)
     # Extract features
@@ -48,7 +49,7 @@ def process(args):
     if args.overwrite or not Path.exists(zip_path):
         for split in SPLITS:
             print(f"Fetching split {split}...")
-            dataset = LIBRISPEECH(out_root.as_posix(), url=split, download=True)
+            dataset = LIBRISPEECH(data_root.as_posix(), url=split, download=True)
             print("Extracting log mel filter bank features...")
             for wav, sample_rate, _, spk_id, chapter_no, utt_no in tqdm(dataset):
                 sample_id = f"{spk_id}-{chapter_no}-{utt_no}"
@@ -96,7 +97,7 @@ def process(args):
             print("Loading the training text...")
             for split in SPLITS:
                 if split.startswith("train"):
-                    dataset = LIBRISPEECH(out_root.as_posix(), url=split)
+                    dataset = LIBRISPEECH(data_root.as_posix(), url=split)
                     for wav, sample_rate, utt, spk_id, chapter_no, utt_no in dataset:
                         train_text.append(utt.lower())
         for t in train_text:
@@ -119,6 +120,7 @@ def process(args):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data-root", "-d", required=True, type=str)
     parser.add_argument("--output-root", "-o", required=True, type=str)
     parser.add_argument(
         "--vocab-type",

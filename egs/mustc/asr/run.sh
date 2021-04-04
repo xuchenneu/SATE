@@ -123,7 +123,7 @@ data_dir=${data_dir}/${lang}
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     echo "stage 1: ASR Network Training"
-    [[ ! -d $data_dir ]] && echo "The data dir $data_dir is not existing!" && exit 1;
+    [[ ! -d ${data_dir} ]] && echo "The data dir ${data_dir} is not existing!" && exit 1;
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
 		if [[ ${gpu_num} -eq 0 ]]; then
