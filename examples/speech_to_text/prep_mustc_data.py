@@ -243,7 +243,7 @@ def process(args):
                 manifest = {c: [] for c in MANIFEST_COLUMNS}
                 if args.task == "st" and args.add_src:
                     manifest["src_text"] = []
-                dataset = MUSTC(args.data_root, lang, split)
+                dataset = MUSTC(args.data_root, lang, split, args.speed_perturb)
                 for idx in range(len(dataset)):
                     items = dataset.get_fast(idx)
                     for item in items:

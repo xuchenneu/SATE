@@ -74,7 +74,7 @@ def process(args):
         print("Generating manifest...")
         for split in SPLITS:
             manifest = {c: [] for c in MANIFEST_COLUMNS}
-            dataset = LIBRISPEECH(out_root.as_posix(), url=split)
+            dataset = LIBRISPEECH(data_root.as_posix(), url=split)
             for wav, sample_rate, utt, spk_id, chapter_no, utt_no in tqdm(dataset):
                 sample_id = f"{spk_id}-{chapter_no}-{utt_no}"
                 manifest["id"].append(sample_id)
