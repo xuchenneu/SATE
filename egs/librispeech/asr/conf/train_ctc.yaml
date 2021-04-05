@@ -12,7 +12,7 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-arch: s2t_conformer_s
+arch: s2t_transformer_s
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
