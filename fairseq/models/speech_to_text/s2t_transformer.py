@@ -229,6 +229,18 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             metavar="STR",
             help="model to take decoder weights from (for initialization)",
         )
+        parser.add_argument(
+            "--encoder-freeze-module",
+            type=str,
+            metavar="STR",
+            help="freeze the module of the encoder",
+        )
+        parser.add_argument(
+            "--decoder-freeze-module",
+            type=str,
+            metavar="STR",
+            help="freeze the module of the decoder",
+        )
         pass
 
     @classmethod
@@ -273,7 +285,14 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             task.target_dictionary, args.decoder_embed_dim
         )
         encoder = cls.build_encoder(args, task, decoder_embed_tokens)
+        if getattr(args, "encoder_freeze_module", None):
+            utils.freeze_parameters(encoder, args.encoder_freeze_module)
+            logging.info("freeze the encoder module: {}".format(args.encoder_freeze_module))
+
         decoder = cls.build_decoder(args, task, decoder_embed_tokens)
+        if getattr(args, "decoder_freeze_module", None):
+            utils.freeze_parameters(decoder, args.decoder_freeze_module)
+            logging.info("freeze the decoder module: {}".format(args.decoder_freeze_module))
         return cls(encoder, decoder)
 
     def get_normalized_probs(

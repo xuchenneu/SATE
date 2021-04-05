@@ -738,3 +738,14 @@ def eval_bool(x, default=False):
         return bool(eval(x))
     except TypeError:
         return default
+
+
+def freeze_parameters(module, freeze_module_name):
+    def freeze_module_params_by_name(module, name):
+        for key, value in module.named_parameters():
+            if name in key:
+                value.requires_grad = False
+
+    freeze_module_name = freeze_module_name.split(",")
+    for name in freeze_module_name:
+        freeze_module_params_by_name(module, name)
