@@ -100,7 +100,10 @@ class LabelSmoothedCrossEntropyCriterionWithCTC(
 
     def compute_ctc_loss(self, model, sample, encoder_out):
         transcript = sample["transcript"]
-        ctc_logit = model.encoder.compute_ctc_logit(encoder_out)
+        if "ctc_logit" in encoder_out:
+            ctc_logit = encoder_out["ctc_logit"][0]
+        else:
+            ctc_logit = model.encoder.compute_ctc_logit(encoder_out)
         lprobs = model.get_normalized_probs(
             [ctc_logit], log_probs=True
         ).contiguous()  # (T, B, C) from the encoder

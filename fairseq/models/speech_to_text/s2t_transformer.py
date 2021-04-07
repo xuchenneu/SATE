@@ -247,26 +247,28 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
     def build_encoder(cls, args, task=None, embed_tokens=None):
         encoder = S2TTransformerEncoder(args, task, embed_tokens)
         if getattr(args, "load_pretrained_encoder_from", None):
-            encoder = checkpoint_utils.load_pretrained_component_from_model(
-                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
-            )
             logger.info(
                 f"loaded pretrained encoder from: "
                 f"{args.load_pretrained_encoder_from}"
             )
+            encoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
+            )
+
         return encoder
 
     @classmethod
     def build_decoder(cls, args, task, embed_tokens):
         decoder = TransformerDecoderScriptable(args, task.target_dictionary, embed_tokens)
         if getattr(args, "load_pretrained_decoder_from", None):
-            decoder = checkpoint_utils.load_pretrained_component_from_model(
-                component=decoder, checkpoint=args.load_pretrained_encoder_from, strict=False
-            )
             logger.info(
                 f"loaded pretrained decoder from: "
                 f"{args.load_pretrained_decoder_from}"
             )
+            decoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=decoder, checkpoint=args.load_pretrained_decoder_from, strict=False
+            )
+
         return decoder
 
     @classmethod
@@ -346,7 +348,7 @@ class S2TTransformerEncoder(FairseqEncoder):
             args.max_source_positions, args.encoder_embed_dim, self.padding_idx, pos_emb_type=self.attn_type
         )
 
-        self.transformer_layers = nn.ModuleList(
+        self.layers = nn.ModuleList(
             [TransformerEncoderLayer(args) for _ in range(args.encoder_layers)]
         )
         if args.encoder_normalize_before:
@@ -372,6 +374,7 @@ class S2TTransformerEncoder(FairseqEncoder):
             self.ctc_dropout_module = FairseqDropout(
                 p=args.dropout, module_name=self.__class__.__name__
             )
+            self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, src_tokens, src_lengths):
         x, input_lengths = self.subsample(src_tokens, src_lengths)
@@ -384,7 +387,7 @@ class S2TTransformerEncoder(FairseqEncoder):
         x = self.dropout_module(x)
         positions = self.dropout_module(positions)
 
-        for layer in self.transformer_layers:
+        for layer in self.layers:
             x = layer(x, encoder_padding_mask, pos_emb=positions)
 
         if self.layer_norm is not None:
@@ -404,17 +407,20 @@ class S2TTransformerEncoder(FairseqEncoder):
     def compute_ctc_logit(self, encoder_out):
         assert self.use_ctc, "CTC is not available!"
 
-        encoder_state = encoder_out["encoder_out"][0]
+        if isinstance(encoder_out, dict) and "encoder_out" in encoder_out:
+            encoder_state = encoder_out["encoder_out"][0]
+        else:
+            encoder_state = encoder_out
         ctc_logit = self.ctc_projection(self.ctc_dropout_module(encoder_state))
 
         return ctc_logit
 
-    def compute_ctc_prob(self, encoder_out):
+    def compute_ctc_prob(self, encoder_out, temperature=1.0):
         assert self.use_ctc, "CTC is not available!"
 
-        ctc_logit = self.compute_ctc_logit(encoder_out)
+        ctc_logit = self.compute_ctc_logit(encoder_out) / temperature
 
-        return ctc_logit.Softmax(dim=-1)
+        return self.softmax(ctc_logit)
 
     def reorder_encoder_out(self, encoder_out, new_order):
         new_encoder_out = (

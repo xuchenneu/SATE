@@ -92,11 +92,11 @@ class S2TConformerEncoder(S2TTransformerEncoder):
     def __init__(self, args, task=None, embed_tokens=None):
         super().__init__(args, task, embed_tokens)
 
-        self.conformer_layers = nn.ModuleList(
+        del self.layers
+
+        self.layers = nn.ModuleList(
             [ConformerEncoderLayer(args) for _ in range(args.encoder_layers)]
         )
-
-        del self.transformer_layers
 
     def forward(self, src_tokens, src_lengths):
         x, input_lengths = self.subsample(src_tokens, src_lengths)
@@ -109,7 +109,7 @@ class S2TConformerEncoder(S2TTransformerEncoder):
         x = self.dropout_module(x)
         positions = self.dropout_module(positions)
 
-        for layer in self.conformer_layers:
+        for layer in self.layers:
             x = layer(x, encoder_padding_mask, pos_emb=positions)
 
         if self.layer_norm is not None:
