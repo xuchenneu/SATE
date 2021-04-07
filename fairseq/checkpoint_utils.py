@@ -711,6 +711,10 @@ def load_pretrained_component_from_model(
 
     missing_keys, unexpected_keys = component.load_state_dict(component_state_dict, strict=strict)
 
+    if len(mismatch_keys) > 0:
+        logger.warning(
+            'Mismatch key(s) in state_dict: {}. '.format(
+                ', '.join('"{}"'.format(k) for k in mismatch_keys)))
     if len(unexpected_keys) > 0:
         logger.warning(
             'Unexpected key(s) in state_dict: {}. '.format(
@@ -719,10 +723,6 @@ def load_pretrained_component_from_model(
         logger.warning(
             'Missing key(s) in state_dict: {}. '.format(
                 ', '.join('"{}"'.format(k) for k in missing_keys)))
-    if len(mismatch_keys) > 0:
-        logger.warning(
-            'Mismatch key(s) in state_dict: {}. '.format(
-                ', '.join('"{}"'.format(k) for k in mismatch_keys)))
 
     return component
 
