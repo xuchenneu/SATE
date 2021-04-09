@@ -38,7 +38,7 @@ vocab_type=unigram
 vocab_size=32000
 share_dict=1
 
-use_specific_dict=1
+use_specific_dict=0
 specific_prefix=st_share10k
 specific_dir=/home/xuchen/st/data/mustc/st/en-de
 src_vocab_prefix=spm_unigram10000_st_share
@@ -132,6 +132,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     mkdir -p ${data_dir}/data
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
+    {
         cmd="spm_encode
         --model ${data_dir}/${src_vocab_prefix}.model
         --output_format=piece
@@ -149,7 +150,9 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
         [[ $eval -eq 1 ]] && eval ${cmd}
+    }&
     done
+    wait
 
     cmd="python ${root_dir}/fairseq_cli/preprocess.py
         --source-lang ${src_lang} --target-lang ${tgt_lang}
@@ -322,6 +325,10 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
+        --post-process sentencepiece
+        --tokenizer moses
+        --moses-source-lang ${src_lang}
+        --moses-target-lang ${tgt_lang}
         --scoring sacrebleu"
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 

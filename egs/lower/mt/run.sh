@@ -323,6 +323,10 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
+        --post-process sentencepiece
+        --tokenizer moses
+        --moses-source-lang ${src_lang}
+        --moses-target-lang ${tgt_lang}
         --scoring sacrebleu"
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 
