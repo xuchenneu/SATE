@@ -36,6 +36,8 @@ def gen_vocab(
         f"--vocab_size={vocab_size}",
         "--character_coverage=0.9995",
         f"--num_threads={cpu_count()}",
+        f"--input_sentence_size=50000000",
+        "--shuffle_input_sentence=true",
         f"--unk_id={UNK_TOKEN_ID}",
         f"--bos_id={BOS_TOKEN_ID}",
         f"--eos_id={EOS_TOKEN_ID}",
