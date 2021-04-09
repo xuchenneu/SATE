@@ -316,7 +316,6 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         ${data_dir}
         --source-lang ${src_lang}
         --target-lang ${tgt_lang}
-        --config-yaml ${data_config}
         --gen-subset ${subset}
         --task ${task}
         --path ${model_dir}/${dec_model}
