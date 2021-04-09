@@ -34,7 +34,7 @@ def gen_vocab(
         f"--model_prefix={output_path_prefix.as_posix()}",
         f"--model_type={model_type}",
         f"--vocab_size={vocab_size}",
-        "--character_coverage=0.9995",
+        "--character_coverage=1.0",
         f"--num_threads={cpu_count()}",
         f"--input_sentence_size=50000000",
         "--shuffle_input_sentence=true",
