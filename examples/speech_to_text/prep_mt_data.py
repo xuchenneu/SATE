@@ -34,7 +34,7 @@ class MTData(Dataset):
     """
 
     def __init__(self, root: str, src_lang, tgt_lang: str, split: str) -> None:
-        _root = Path(root) / f"{src_lang}-{tgt_lang}" / "data" / split
+        _root = Path(root) / f"{src_lang}-{tgt_lang}" / "data"
         txt_root = _root
         assert _root.is_dir() and txt_root.is_dir(), (_root, txt_root)
         # Load source and target text
