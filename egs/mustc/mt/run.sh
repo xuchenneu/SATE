@@ -20,7 +20,7 @@ stop_stage=0
 
 ######## hardware ########
 # devices
-device=()
+#device=()
 gpu_num=8
 update_freq=1
 
@@ -38,12 +38,17 @@ vocab_type=unigram
 vocab_size=10000
 share_dict=1
 
+use_specific_dict=1
+specific_prefix=st_share10k
+specific_dir=/home/xuchen/st/data/mustc/st/en-de
+src_vocab_prefix=spm_unigram10000_st_share
+tgt_vocab_prefix=spm_unigram10000_st_share
+
 org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/mt/${lang}
-train_prefix=train
-valid_prefix=dev
-test_prefix=tst-COMMON
-test_subset=(test)
+train_subset=train
+valid_subset=dev
+test_subset=test
 
 # exp
 extra_tag=
@@ -64,18 +69,22 @@ bleu_valid=0
 n_average=10
 beam_size=5
 
-. ./local/parse_options.sh || exit 1;
-
-if [[ $step_valid -eq 1 ]]; then
-    validate_interval=10000
-    save_interval=10000
-    no_epoch_checkpoints=1
-    save_interval_updates=5000
-    keep_interval_updates=3
+if [[ ${use_specific_dict} -eq 1 ]]; then
+    exp_tag=${specific_prefix}_${exp_tag}
+    data_dir=${data_dir}/${specific_prefix}
+    mkdir -p ${data_dir}
 else
-    validate_interval=1
-    keep_last_epochs=10
+    data_dir=${data_dir}/${vocab_type}${vocab_size}
+    src_vocab_prefix=spm_${vocab_type}${vocab_size}_${src_lang}
+    tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_${tgt_lang}
+    if [[ $share_dict -eq 1 ]]; then
+        data_dir=${data_dir}_share
+        src_vocab_prefix=spm_${vocab_type}${vocab_size}_share
+        tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_share
+    fi
 fi
+
+. ./local/parse_options.sh || exit 1;
 
 # full path
 train_config=$pwd_dir/conf/${train_config}
@@ -85,17 +94,11 @@ if [[ -z ${exp_name} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
 fi
-
 model_dir=$root_dir/../checkpoints/$dataset/mt/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
     echo "stage -1: Data Download"
     # pass
-fi
-
-data_dir=${data_dir}/${vocab_type}${vocab_size}
-if [[ $share_dict -eq 1 ]]; then
-    data_dir=${data_dir}_share
 fi
 
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
@@ -105,32 +108,34 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         mkdir -p ${data_dir}
     fi
 
-    src_vocab_prefix=spm_${vocab_type}${vocab_size}_${src_lang}
-    tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_${tgt_lang}
-    cmd="python ${root_dir}/examples/speech_to_text/prep_mt_data.py
-        --data-root ${org_data_dir}
-        --output-root ${data_dir}
-        --splits ${train_prefix},${valid_prefix},${test_prefix}
-        --src-lang ${src_lang}
-        --tgt-lang ${tgt_lang}
-        --vocab-type ${vocab_type}
-        --vocab-size ${vocab_size}"
-    if [[ $share_dict -eq 1 ]]; then
-        cmd="$cmd
-        --share"
-        src_vocab_prefix=spm_unigram${vocab_size}_share
-        tgt_vocab_prefix=spm_unigram${vocab_size}_share
+    if [[ ! -f ${data_dir}/${src_vocab_prefix}.txt || ! -f ${data_dir}/${tgt_vocab_prefix}.txt ]]; then
+        if [[ ${use_specific_dict} -eq 0 ]]; then
+            cmd="python ${root_dir}/examples/speech_to_text/prep_mt_data.py
+                --data-root ${org_data_dir}
+                --output-root ${data_dir}
+                --splits ${train_subset},${valid_subset},${test_subset}
+                --src-lang ${src_lang}
+                --tgt-lang ${tgt_lang}
+                --vocab-type ${vocab_type}
+                --vocab-size ${vocab_size}"
+            if [[ $share_dict -eq 1 ]]; then
+                cmd="$cmd
+                --share"
+            fi
+            echo -e "\033[34mRun command: \n${cmd} \033[0m"
+            [[ $eval -eq 1 ]] && eval ${cmd}
+        else
+            cp -r ${specific_dir}/${src_vocab_prefix}.* ${data_dir}
+            cp ${specific_dir}/${tgt_vocab_prefix}.* ${data_dir}
+        fi
     fi
 
-    echo -e "\033[34mRun command: \n${cmd} \033[0m"
-    [[ $eval -eq 1 ]] && eval ${cmd}
-
     mkdir -p ${data_dir}/data
-    for split in ${train_prefix} ${valid_prefix} ${test_prefix}; do
+    for split in ${train_subset} ${valid_subset} ${test_subset}; do
         cmd="spm_encode
         --model ${data_dir}/${src_vocab_prefix}.model
         --output_format=piece
-        < ${org_data_dir}/${lang}/data/${split}/${split}.${src_lang}
+        < ${org_data_dir}/${lang}/data/${split}.${src_lang}
         > ${data_dir}/data/${split}.${src_lang}"
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
@@ -139,7 +144,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         cmd="spm_encode
         --model ${data_dir}/${tgt_vocab_prefix}.model
         --output_format=piece
-        < ${org_data_dir}/${lang}/data/${split}/${split}.${tgt_lang}
+        < ${org_data_dir}/${lang}/data/${split}.${tgt_lang}
         > ${data_dir}/data/${split}.${tgt_lang}"
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
@@ -148,9 +153,9 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     cmd="python ${root_dir}/fairseq_cli/preprocess.py
         --source-lang ${src_lang} --target-lang ${tgt_lang}
-        --trainpref ${data_dir}/data/${train_prefix}
-        --validpref ${data_dir}/data/${valid_prefix}
-        --testpref ${data_dir}/data/${test_prefix}
+        --trainpref ${data_dir}/data/${train_subset}
+        --validpref ${data_dir}/data/${valid_subset}
+        --testpref ${data_dir}/data/${test_subset}
         --destdir ${data_dir}/data-bin
         --srcdict ${data_dir}/${src_vocab_prefix}.txt
         --tgtdict ${data_dir}/${tgt_vocab_prefix}.txt
@@ -211,6 +216,16 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     if [[ $fp16 -eq 1 ]]; then
         cmd="${cmd}
         --fp16"
+    fi
+    if [[ $step_valid -eq 1 ]]; then
+        validate_interval=10000
+        save_interval=10000
+        no_epoch_checkpoints=1
+        save_interval_updates=5000
+        keep_interval_updates=3
+    else
+        validate_interval=1
+        keep_last_epochs=10
     fi
     if [[ $bleu_valid -eq 1 ]]; then
         cmd="$cmd
@@ -295,6 +310,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
+    test_subset=(${test_subset//,/ })
 	for subset in ${test_subset[@]}; do
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}

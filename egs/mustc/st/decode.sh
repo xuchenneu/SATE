@@ -2,7 +2,8 @@
 
 gpu_num=1
 
-test_subset=(tst-COMMON)
+data_dir=
+test_subset=tst-COMMON
 
 exp_name=
 if [ "$#" -eq 1 ]; then
@@ -18,11 +19,17 @@ cmd="./run.sh
     --stop_stage 2
     --gpu_num ${gpu_num}
     --exp_name ${exp_name}
-    --test_subset ${test_subset}
     --n_average ${n_average}
     --beam_size ${beam_size}
     --max_tokens ${max_tokens}
     "
+
+if [[ -n ${data_dir} ]]; then
+    cmd="$cmd --data_dir ${data_dir}"
+fi
+if [[ -n ${test_subset} ]]; then
+    cmd="$cmd --test_subset ${test_subset}"
+fi
 
 echo $cmd
 eval $cmd

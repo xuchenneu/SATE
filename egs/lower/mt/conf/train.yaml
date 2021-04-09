@@ -1,19 +1,18 @@
 train-subset: train
 valid-subset: valid
 
-max-epoch: 20
+max-epoch: 50
 max-update: 100000
 
-skip-invalid-size-inputs-valid-test: True
 num-workers: 8
 patience: 10
 no-progress-bar: True
 log-interval: 100
 seed: 1
 report-accuracy: True
+skip-invalid-size-inputs-valid-test: True
 
-#load-params: 
-#load-pretrained-encoder-from: 
+#load-pretrained-encoder-from:
 
 arch: transformer
 share-decoder-input-output-embed: True
@@ -30,14 +29,14 @@ label_smoothing: 0.1
 
 dropout: 0.1
 activation-fn: relu
-encoder-embed-dim: 512
+encoder-normalize-before: True
+decoder-normalize-before: True
+encoder-embed-dim: 256
 encoder-ffn-embed-dim: 2048
 encoder-layers: 6
 decoder-layers: 6
-encoder-attention-heads: 8
+encoder-attention-heads: 4
 
-#decoder-embed-dim: 256
-#decoder-ffn-embed-dim: 2048
-#decoder-attention-heads: 4
-#attention-dropout: 0.1
-#activation-dropout: 0.1
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4

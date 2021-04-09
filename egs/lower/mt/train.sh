@@ -2,7 +2,7 @@
 
 # training the model
 
-gpu_num=8
+gpu_num=1
 update_freq=1
 max_tokens=4096
 

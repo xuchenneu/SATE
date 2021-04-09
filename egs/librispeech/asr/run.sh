@@ -39,7 +39,7 @@ speed_perturb=0
 
 org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}
-test_subset=(dev-clean dev-other test-clean test-other)
+test_subset=dev-clean,dev-other,test-clean,test-other
 
 # exp
 extra_tag=
@@ -60,18 +60,11 @@ step_valid=0
 n_average=10
 beam_size=5
 
-. ./local/parse_options.sh || exit 1;
-
-if [[ $step_valid -eq 1 ]]; then
-    validate_interval=10000
-    save_interval=10000
-    no_epoch_checkpoints=1
-    save_interval_updates=5000
-    keep_interval_updates=3
-else
-    validate_interval=1
-    keep_last_epochs=10
+if [[ ${speed_perturb} -eq 1 ]]; then
+    data_dir=${data_dir}_sp
 fi
+
+. ./local/parse_options.sh || exit 1;
 
 # full path
 train_config=$pwd_dir/conf/${train_config}
@@ -83,10 +76,6 @@ if [[ -z ${exp_name} ]]; then
     if [[ ${speed_perturb} -eq 1 ]]; then
         exp_name=sp_${exp_name}
     fi
-fi
-
-if [[ ${speed_perturb} -eq 1 ]]; then
-    data_dir=${data_dir}_sp
 fi
 model_dir=$root_dir/../checkpoints/$dataset/asr/${exp_name}
 
@@ -167,6 +156,16 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         cmd="${cmd}
         --fp16"
     fi
+    if [[ $step_valid -eq 1 ]]; then
+        validate_interval=10000
+        save_interval=10000
+        no_epoch_checkpoints=1
+        save_interval_updates=5000
+        keep_interval_updates=3
+    else
+        validate_interval=1
+        keep_last_epochs=10
+    fi
     if [[ -n $no_epoch_checkpoints && $no_epoch_checkpoints -eq 1 ]]; then
         cmd="$cmd
         --no-epoch-checkpoints"
@@ -241,6 +240,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
+    test_subset=(${test_subset//,/ })
 	for subset in ${test_subset[@]}; do
         subset=${subset}
   		cmd="python ${root_dir}/fairseq_cli/generate.py
