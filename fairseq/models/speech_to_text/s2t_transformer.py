@@ -356,8 +356,9 @@ class S2TTransformerEncoder(FairseqEncoder):
         else:
             self.layer_norm = None
 
-        self.use_ctc = ("ctc" in getattr(args, "criterion", False)) and \
-                       (getattr(args, "ctc_weight", False) > 0)
+        self.use_ctc = "sate" in args.arch or \
+                       (("ctc" in getattr(args, "criterion", False)) and \
+                        (getattr(args, "ctc_weight", False) > 0))
         if self.use_ctc:
             if task.source_dictionary == task.target_dictionary and getattr(args, "share_all_embeddings", False):
                 self.ctc_projection = nn.Linear(
