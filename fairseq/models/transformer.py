@@ -5,10 +5,11 @@
 
 import math
 from typing import Any, Dict, List, Optional, Tuple
+import logging
 
 import torch
 import torch.nn as nn
-from fairseq import utils
+from fairseq import checkpoint_utils, utils
 from fairseq.distributed import fsdp_wrap
 from fairseq.models import (
     FairseqEncoder,
@@ -34,6 +35,8 @@ from torch import Tensor
 
 DEFAULT_MAX_SOURCE_POSITIONS = 1024
 DEFAULT_MAX_TARGET_POSITIONS = 1024
+
+logger = logging.getLogger(__name__)
 
 
 @register_model("transformer")
@@ -191,6 +194,35 @@ class TransformerModel(FairseqEncoderDecoderModel):
                             help='block size of quantization noise at training time')
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--max-relative-length', type=int, default=-1,
+                            help='the max relative length')
+        parser.add_argument('--k-only', default=False, action='store_true',
+                            help='select the relative mode to map relative position information')
+        # args for loading pre-trained models
+        parser.add_argument(
+            "--load-pretrained-encoder-from",
+            type=str,
+            metavar="STR",
+            help="model to take encoder weights from (for initialization)",
+        )
+        parser.add_argument(
+            "--load-pretrained-decoder-from",
+            type=str,
+            metavar="STR",
+            help="model to take decoder weights from (for initialization)",
+        )
+        parser.add_argument(
+            "--encoder-freeze-module",
+            type=str,
+            metavar="STR",
+            help="freeze the module of the encoder",
+        )
+        parser.add_argument(
+            "--decoder-freeze-module",
+            type=str,
+            metavar="STR",
+            help="freeze the module of the decoder",
+        )
         # fmt: on
 
     @classmethod
@@ -240,7 +272,15 @@ class TransformerModel(FairseqEncoderDecoderModel):
         if getattr(args, "offload_activations", False):
             args.checkpoint_activations = True  # offloading implies checkpointing
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
+        if getattr(args, "encoder_freeze_module", None):
+            utils.freeze_parameters(encoder, args.encoder_freeze_module)
+            logging.info("freeze the encoder module: {}".format(args.encoder_freeze_module))
+
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+        if getattr(args, "decoder_freeze_module", None):
+            utils.freeze_parameters(decoder, args.decoder_freeze_module)
+            logging.info("freeze the decoder module: {}".format(args.decoder_freeze_module))
+
         if not args.share_all_embeddings:
             encoder = fsdp_wrap(encoder, min_num_params=1e8)
             decoder = fsdp_wrap(decoder, min_num_params=1e8)
@@ -260,16 +300,37 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
     @classmethod
     def build_encoder(cls, args, src_dict, embed_tokens):
-        return TransformerEncoder(args, src_dict, embed_tokens)
+        encoder = TransformerEncoder(args, src_dict, embed_tokens)
+        if getattr(args, "load_pretrained_encoder_from", None):
+            logger.info(
+                f"loaded pretrained encoder from: "
+                f"{args.load_pretrained_encoder_from}"
+            )
+            encoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
+            )
+
+        return encoder
 
     @classmethod
     def build_decoder(cls, args, tgt_dict, embed_tokens):
-        return TransformerDecoder(
+        decoder = TransformerDecoder(
             args,
             tgt_dict,
             embed_tokens,
             no_encoder_attn=getattr(args, "no_cross_attention", False),
         )
+
+        if getattr(args, "load_pretrained_decoder_from", None):
+            logger.info(
+                f"loaded pretrained decoder from: "
+                f"{args.load_pretrained_decoder_from}"
+            )
+            decoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=decoder, checkpoint=args.load_pretrained_decoder_from, strict=False
+            )
+
+        return decoder
 
     # TorchScript doesn't support optional arguments with variable length (**kwargs).
     # Current workaround is to add union of all arguments in child classes.
@@ -1073,6 +1134,15 @@ def base_architecture(args):
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
     args.quant_noise_pq_block_size = getattr(args, "quant_noise_pq_block_size", 8)
     args.quant_noise_scalar = getattr(args, "quant_noise_scalar", 0)
+    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.k_only = getattr(args, 'k_only', True)
+
+
+@register_model_architecture("transformer", "transformer_relative")
+def transformer_rpr(args):
+    args.max_relative_length = 20
+    args.k_only = True
+    base_architecture(args)
 
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")

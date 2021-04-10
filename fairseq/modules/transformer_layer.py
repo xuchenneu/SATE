@@ -8,7 +8,12 @@ from typing import Dict, List, Optional
 import torch
 import torch.nn as nn
 from fairseq import utils
-from fairseq.modules import LayerNorm, MultiheadAttention, RelPositionMultiheadAttention
+from fairseq.modules import (
+    LayerNorm,
+    MultiheadAttention,
+    RelPositionMultiheadAttention,
+    RelativeMultiheadAttention
+)
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
@@ -82,6 +87,16 @@ class TransformerEncoderLayer(nn.Module):
             attn_func = MultiheadAttention
         elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
+        elif self.attn_type == "relative" or getattr(args, "max_relative_length", -1) != -1:
+            return RelativeMultiheadAttention(
+                embed_dim,
+                args.encoder_attention_heads,
+                dropout=args.attention_dropout,
+                self_attention=True,
+                q_noise=self.quant_noise,
+                qn_block_size=self.quant_noise_block_size,
+                max_relative_length=args.max_relative_length,
+            )
         else:
             print("The attention type %s is not supported!" % self.attn_type)
             exit(1)
@@ -277,6 +292,16 @@ class TransformerDecoderLayer(nn.Module):
             attn_func = MultiheadAttention
         elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
+        elif self.attn_type == "relative" or getattr(args, "max_relative_length", -1) != -1:
+            return RelativeMultiheadAttention(
+                embed_dim,
+                args.encoder_attention_heads,
+                dropout=args.attention_dropout,
+                self_attention=True,
+                q_noise=self.quant_noise,
+                qn_block_size=self.quant_noise_block_size,
+                max_relative_length=args.max_relative_length,
+            )
         else:
             print("The attention type %s is not supported!" % self.attn_type)
             exit(1)

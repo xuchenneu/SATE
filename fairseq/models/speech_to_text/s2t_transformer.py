@@ -217,6 +217,10 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             action="store_true",
             help="if True, dont scale embeddings",
         )
+        parser.add_argument('--max-relative-length', type=int, default=-1,
+                            help='the max relative length')
+        parser.add_argument('--k-only', default=False, action='store_true',
+                            help='select the relative mode to map relative position information')
         parser.add_argument(
             "--load-pretrained-encoder-from",
             type=str,
@@ -518,6 +522,9 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
 
+    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.k_only = getattr(args, 'k_only', True)
+
 
 @register_model_architecture("s2t_transformer", "s2t_transformer_s")
 def s2t_transformer_s(args):
@@ -527,6 +534,13 @@ def s2t_transformer_s(args):
     args.decoder_attention_heads = getattr(args, "decoder_attention_heads", 4)
     args.dropout = getattr(args, "dropout", 0.1)
     base_architecture(args)
+
+
+@register_model_architecture("s2t_transformer", "s2t_transformer_s_relative")
+def s2t_transformer_s_relative(args):
+    args.max_relative_length = 20
+    args.k_only = True
+    s2t_transformer_s(args)
 
 
 @register_model_architecture("s2t_transformer", "s2t_transformer_xs")

@@ -182,6 +182,13 @@ def s2t_conformer_s(args):
     base_architecture(args)
 
 
+@register_model_architecture("s2t_conformer", "s2t_conformer_s_relative")
+def s2t_conformer_s_relative(args):
+    args.max_relative_length = 20
+    args.k_only = True
+    s2t_conformer_s(args)
+
+
 @register_model_architecture("s2t_conformer", "s2t_conformer_xs")
 def s2t_conformer_xs(args):
     args.encoder_layers = getattr(args, "encoder_layers", 6)
