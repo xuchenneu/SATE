@@ -10,7 +10,7 @@ if [ "$#" -eq 1 ]; then
     exp_name=$1
 fi
 
-n_average=5
+n_average=10
 beam_size=5
 max_tokens=20000
 
