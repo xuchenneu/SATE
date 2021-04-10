@@ -3,13 +3,12 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import math
 from typing import Dict, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 from fairseq import utils
-from fairseq.modules.multihead_attention import MultiheadAttention
+from fairseq.modules import MultiheadAttention
 from torch import Tensor, nn
 from torch.nn import Parameter
 
@@ -56,11 +55,10 @@ class RelativeMultiheadAttention(MultiheadAttention):
         self.k_only = k_only
 
         self.relative_position_keys = Parameter(torch.Tensor(2 * self.max_relative_length + 1, self.head_dim))
+        nn.init.xavier_uniform_(self.relative_position_keys)
+
         if not self.k_only:
             self.relative_position_values = Parameter(torch.Tensor(2 * self.max_relative_length + 1, self.head_dim))
-
-        nn.init.xavier_uniform_(self.relative_position_keys)
-        if not self.k_only:
             nn.init.xavier_uniform_(self.relative_position_values)
 
     def forward(

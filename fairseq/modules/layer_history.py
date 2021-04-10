@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from fairseq.models.transformer import LayerNorm
+from fairseq.modules.layer_norm import LayerNorm
 import queue
 import numpy as np
 

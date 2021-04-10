@@ -147,7 +147,8 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             default="selfattn",
             choices=[
                 "selfattn",
-                "rel_selfattn"
+                "rel_selfattn",
+                "relative",
             ],
             help="transformer encoder self-attention layer type"
         )
@@ -183,7 +184,8 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             default="selfattn",
             choices=[
                 "selfattn",
-                "rel_selfattn"
+                "rel_selfattn",
+                "relative",
             ],
             help="transformer decoder self-attention layer type"
         )

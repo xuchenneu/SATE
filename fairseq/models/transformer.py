@@ -194,6 +194,29 @@ class TransformerModel(FairseqEncoderDecoderModel):
                             help='block size of quantization noise at training time')
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
+
+        parser.add_argument(
+            "--encoder-attention-type",
+            type=str,
+            default="selfattn",
+            choices=[
+                "selfattn",
+                "rel_selfattn",
+                "relative",
+            ],
+            help="transformer encoder self-attention layer type"
+        )
+        parser.add_argument(
+            "--decoder-attention-type",
+            type=str,
+            default="selfattn",
+            choices=[
+                "selfattn",
+                "rel_selfattn",
+                "relative",
+            ],
+            help="transformer decoder self-attention layer type"
+        )
         parser.add_argument('--max-relative-length', type=int, default=-1,
                             help='the max relative length')
         parser.add_argument('--k-only', default=False, action='store_true',
@@ -1134,6 +1157,10 @@ def base_architecture(args):
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
     args.quant_noise_pq_block_size = getattr(args, "quant_noise_pq_block_size", 8)
     args.quant_noise_scalar = getattr(args, "quant_noise_scalar", 0)
+
+    args.encoder_attention_type = getattr(args, "encoder_attention_type", "selfattn")
+    args.decoder_attention_type = getattr(args, "decoder_attention_type", "selfattn")
+
     args.max_relative_length = getattr(args, 'max_relative_length', -1)
     args.k_only = getattr(args, 'k_only', True)
 
