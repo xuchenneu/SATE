@@ -171,6 +171,9 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
 
+    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.k_only = getattr(args, 'k_only', True)
+
 
 @register_model_architecture("s2t_conformer", "s2t_conformer_s")
 def s2t_conformer_s(args):
