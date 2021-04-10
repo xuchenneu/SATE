@@ -221,11 +221,12 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         --fp16"
     fi
     if [[ $step_valid -eq 1 ]]; then
-        validate_interval=10000
-        save_interval=10000
-        no_epoch_checkpoints=1
-        save_interval_updates=5000
-        keep_interval_updates=3
+        validate_interval=1
+        save_interval=1
+        keep_last_epochs=10
+        no_epoch_checkpoints=0
+        save_interval_updates=10000
+        keep_interval_updates=10
     else
         validate_interval=1
         keep_last_epochs=10
