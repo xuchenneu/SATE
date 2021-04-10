@@ -11,9 +11,9 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-pretrained-acoustic-encoder-from: /home/xuchen/st/checkpoints/mustc/asr/train_ctc_st_vocab/avg_10_checkpoint.pt
-#load-pretrained-text-encoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
-#load-pretrained-decoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
+load-pretrained-acoustic-encoder-from: /home/xuchen/st/checkpoints/mustc/asr/train_ctc_st_vocab/avg_10_checkpoint.pt
+load-pretrained-text-encoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
+load-pretrained-decoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
 
 arch: s2t_sate
 share-decoder-input-output-embed: True
@@ -25,8 +25,7 @@ warmup-updates: 10000
 lr: 2e-3
 #adam_betas: (0.9,0.98)
 
-ctc-weight: 0.3
-criterion: label_smoothed_cross_entropy_with_ctc
+criterion: label_smoothed_cross_entropy
 label_smoothing: 0.1
 
 encoder-normalize-before: True

@@ -38,10 +38,10 @@ vocab_type=unigram
 asr_vocab_size=5000
 vocab_size=10000
 share_dict=1
-speed_perturb=1
+speed_perturb=0
 
 org_data_dir=/media/data/${dataset}
-data_dir=~/st/data/${dataset}/st
+data_dir=~/st/data/${dataset}/st_lcrm
 test_subset=tst-COMMON
 
 # exp
@@ -121,6 +121,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --output-root ${data_dir}
         --task st
         --add-src
+        --lowercase-src
+        --rm-punc-src
         --cmvn-type utterance
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"

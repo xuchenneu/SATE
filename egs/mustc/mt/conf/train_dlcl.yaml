@@ -15,7 +15,7 @@ skip-invalid-size-inputs-valid-test: True
 #load-pretrained-encoder-from:
 #load-pretrained-decoder-from:
 
-arch: transformer
+arch: dlcl_transformer
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0

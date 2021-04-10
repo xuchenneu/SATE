@@ -6,14 +6,15 @@ gpu_num=8
 update_freq=2
 max_tokens=20000
 
-extra_tag=
+extra_tag=lcrm
 extra_parameter=
 
 #extra_tag="${extra_tag}"
 #extra_parameter="${extra_parameter} "
 
-exp_tag=
-train_config=train_ctc.yaml
+exp_tag=baseline
+train_config=train_ctc_sate.yaml
+#train_config=train_ctc.yaml
 
 cmd="./run.sh
     --stage 1

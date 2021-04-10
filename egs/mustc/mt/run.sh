@@ -37,10 +37,11 @@ task=translation
 vocab_type=unigram
 vocab_size=10000
 share_dict=1
+lc_rm=1
 
 use_specific_dict=1
-specific_prefix=st_share10k
-specific_dir=/home/xuchen/st/data/mustc/st/en-de
+specific_prefix=st_share10k_lcrm
+specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
 src_vocab_prefix=spm_unigram10000_st_share
 tgt_vocab_prefix=spm_unigram10000_st_share
 
@@ -48,7 +49,8 @@ org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/mt/${lang}
 train_subset=train
 valid_subset=dev
-test_subset=test
+test_subset=tst-COMMON
+trans_set=test
 
 # exp
 extra_tag=
@@ -132,10 +134,13 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     mkdir -p ${data_dir}/data
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
-        cmd="spm_encode
-        --model ${data_dir}/${src_vocab_prefix}.model
+        cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
+        if [[ ${lc_rm} -eq 1 ]]; then
+            cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
+        fi
+        cmd="${cmd}
+        | spm_encode --model ${data_dir}/${src_vocab_prefix}.model
         --output_format=piece
-        < ${org_data_dir}/${lang}/data/${split}.${src_lang}
         > ${data_dir}/data/${split}.${src_lang}"
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
@@ -311,8 +316,8 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
-    test_subset=(${test_subset//,/ })
-	for subset in ${test_subset[@]}; do
+    trans_set=(${trans_set//,/ })
+	for subset in ${trans_set[@]}; do
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}
         --source-lang ${src_lang}

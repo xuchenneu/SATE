@@ -36,10 +36,10 @@ dataset=mustc
 task=speech_to_text
 vocab_type=unigram
 vocab_size=5000
-speed_perturb=1
+speed_perturb=0
 
 org_data_dir=/media/data/${dataset}
-data_dir=~/st/data/${dataset}/asr
+data_dir=~/st/data/${dataset}/asr_lcrm
 test_subset=tst-COMMON
 
 # exp
@@ -51,6 +51,7 @@ exp_name=
 # config
 train_config=train_ctc.yaml
 data_config=config_asr.yaml
+data_config=config_st_share.yaml
 
 # training setting
 fp16=1
@@ -98,6 +99,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --data-root ${org_data_dir}
         --output-root ${data_dir}
         --task asr
+        --lowercase-src
+        --rm-punc-src
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
     if [[ ${speed_perturb} -eq 1 ]]; then

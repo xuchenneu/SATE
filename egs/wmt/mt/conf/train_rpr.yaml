@@ -44,3 +44,7 @@ encoder-attention-heads: 8
 decoder-embed-dim: 512
 decoder-ffn-embed-dim: 2048
 decoder-attention-heads: 8
+
+encoder-attention-type: relative
+decoder-attention-type: relative
+max-relative-length: 20

@@ -15,7 +15,7 @@ skip-invalid-size-inputs-valid-test: True
 #load-pretrained-encoder-from:
 #load-pretrained-decoder-from:
 
-arch: transformer
+arch: dlcl_transformer
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
@@ -44,3 +44,7 @@ encoder-attention-heads: 8
 decoder-embed-dim: 512
 decoder-ffn-embed-dim: 2048
 decoder-attention-heads: 8
+
+encoder-attention-type: relative
+decoder-attention-type: relative
+max-relative-length: 20
