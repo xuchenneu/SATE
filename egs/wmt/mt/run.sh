@@ -37,6 +37,7 @@ task=translation
 vocab_type=unigram
 vocab_size=32000
 share_dict=1
+lc_rm=1
 
 use_specific_dict=0
 specific_prefix=st_share10k
@@ -62,7 +63,7 @@ train_config=train.yaml
 # training setting
 fp16=1
 max_tokens=4096
-step_valid=0
+step_valid=1
 bleu_valid=0
 
 # decoding setting
@@ -116,6 +117,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
                 --splits ${train_subset},${valid_subset},${test_subset}
                 --src-lang ${src_lang}
                 --tgt-lang ${tgt_lang}
+                --lowercase-src
+                --rm-punc-src
                 --vocab-type ${vocab_type}
                 --vocab-size ${vocab_size}"
             if [[ $share_dict -eq 1 ]]; then
@@ -133,10 +136,13 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     mkdir -p ${data_dir}/data
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
     {
-        cmd="spm_encode
-        --model ${data_dir}/${src_vocab_prefix}.model
+        cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
+        if [[ ${lc_rm} -eq 1 ]]; then
+            cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
+        fi
+        cmd="${cmd}
+        | spm_encode --model ${data_dir}/${src_vocab_prefix}.model
         --output_format=piece
-        < ${org_data_dir}/${lang}/data/${split}.${src_lang}
         > ${data_dir}/data/${split}.${src_lang}"
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"

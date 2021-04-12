@@ -134,6 +134,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
     mkdir -p ${data_dir}/data
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
+    {
         cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
         if [[ ${lc_rm} -eq 1 ]]; then
             cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
@@ -154,7 +155,9 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 
         echo -e "\033[34mRun command: \n${cmd} \033[0m"
         [[ $eval -eq 1 ]] && eval ${cmd}
+    }&
     done
+    wait
 
     cmd="python ${root_dir}/fairseq_cli/preprocess.py
         --source-lang ${src_lang} --target-lang ${tgt_lang}

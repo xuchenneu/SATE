@@ -246,6 +246,7 @@ def process(args):
                         if args.rm_punc_src:
                             for w in string.punctuation:
                                 src_utt = src_utt.replace(w, "")
+                            src_utt = src_utt.replace("  ", "")
                         manifest["tgt_text"].append(src_utt if args.task == "asr" else tgt_utt)
                         if args.task == "st" and args.add_src:
                             manifest["src_text"].append(src_utt)
@@ -285,7 +286,9 @@ def process(args):
                             if args.lowercase_src:
                                 src_utt = src_utt.lower()
                             if args.rm_punc_src:
-                                src_utt = src_utt.translate(None, string.punctuation)
+                                for w in string.punctuation:
+                                    src_utt = src_utt.replace(w, "")
+                                src_utt = src_utt.replace("  ", "")
                             train_text.append(src_utt)
                         train_text.append(tgt_utt)
 

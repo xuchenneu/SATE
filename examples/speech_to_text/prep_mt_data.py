@@ -10,11 +10,10 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Tuple
+import string
 
-import pandas as pd
 from examples.speech_to_text.data_utils import (
     gen_vocab,
-    save_df_to_tsv,
 )
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -75,6 +74,13 @@ def process(args):
 
         dataset = MTData(args.data_root, src_lang, tgt_lang, split)
         for src_text, tgt_text in tqdm(dataset):
+            if args.lowercase_src:
+                src_text = src_text.lower()
+            if args.rm_punc_src:
+                for w in string.punctuation:
+                    src_text = src_text.replace(w, "")
+                src_text = src_text.replace("  ", "")
+
             manifest["src_text"].append(src_text)
             manifest["tgt_text"].append(tgt_text)
 
@@ -154,6 +160,8 @@ def main():
     parser.add_argument("--vocab-size", default=10000, type=int)
     parser.add_argument("--size", default=-1, type=int)
     parser.add_argument("--splits", default="train,dev,test", type=str)
+    parser.add_argument("--lowercase-src", action="store_true", help="lowercase the source text")
+    parser.add_argument("--rm-punc-src", action="store_true", help="remove the punctuation of the source text")
     parser.add_argument("--src-lang", required=True, type=str)
     parser.add_argument("--tgt-lang", required=True, type=str)
     parser.add_argument("--share", action="store_true", help="share the source and target vocabulary")
