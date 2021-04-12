@@ -19,6 +19,7 @@ from fairseq.modules import (
     LayerNorm,
     PositionalEmbedding,
     TransformerEncoderLayer,
+    CreateLayerHistory,
 )
 from torch import Tensor
 
@@ -247,6 +248,28 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             metavar="STR",
             help="freeze the module of the decoder",
         )
+        parser.add_argument(
+            "--use-enc-dlcl",
+            default=False,
+            action='store_true',
+            help="use dlcl encoder",
+        )
+        parser.add_argument(
+            "--use-dec-dlcl",
+            default=False,
+            action='store_true',
+            help="use dlcl encoder",
+        )
+        parser.add_argument(
+            '--encoder-history-type',
+            default="learnable_dense",
+            help='encoder layer history type'
+        )
+        parser.add_argument(
+            '--decoder-history-type',
+            default="learnable_dense",
+            help='decoder layer history type'
+        )
         pass
 
     @classmethod
@@ -362,6 +385,11 @@ class S2TTransformerEncoder(FairseqEncoder):
         else:
             self.layer_norm = None
 
+        if getattr(args, "use_enc_dlcl", False):
+            self.history = CreateLayerHistory(args, is_encoder=True)
+        else:
+            self.history = None
+
         self.use_ctc = "sate" in args.arch or \
                        (("ctc" in getattr(args, "criterion", False)) and \
                         (getattr(args, "ctc_weight", False) > 0))
@@ -384,6 +412,10 @@ class S2TTransformerEncoder(FairseqEncoder):
             self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, src_tokens, src_lengths):
+
+        if self.history is not None:
+            self.history.clean()
+
         x, input_lengths = self.subsample(src_tokens, src_lengths)
         x = self.embed_scale * x
 
@@ -394,8 +426,19 @@ class S2TTransformerEncoder(FairseqEncoder):
         x = self.dropout_module(x)
         positions = self.dropout_module(positions)
 
+        # add emb into history
+        if self.history is not None:
+            self.history.add(x)
+
         for layer in self.layers:
+            if self.history is not None:
+                x = self.history.pop()
             x = layer(x, encoder_padding_mask, pos_emb=positions)
+            if self.history is not None:
+                self.history.add(x)
+
+        if self.history is not None:
+            x = self.history.pop()
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)

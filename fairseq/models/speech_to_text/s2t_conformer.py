@@ -99,6 +99,9 @@ class S2TConformerEncoder(S2TTransformerEncoder):
         )
 
     def forward(self, src_tokens, src_lengths):
+        if self.history is not None:
+            self.history.clean()
+
         x, input_lengths = self.subsample(src_tokens, src_lengths)
         x = self.embed_scale * x
 
@@ -109,8 +112,19 @@ class S2TConformerEncoder(S2TTransformerEncoder):
         x = self.dropout_module(x)
         positions = self.dropout_module(positions)
 
+        # add emb into history
+        if self.history is not None:
+            self.history.add(x)
+
         for layer in self.layers:
+            if self.history is not None:
+                x = self.history.pop()
             x = layer(x, encoder_padding_mask, pos_emb=positions)
+            if self.history is not None:
+                self.history.add(x)
+
+        if self.history is not None:
+            x = self.history.pop()
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)

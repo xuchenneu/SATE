@@ -16,13 +16,15 @@ from fairseq.models.speech_to_text import (
     S2TTransformerModel,
     S2TTransformerEncoder,
     S2TConformerEncoder,
-    S2TConformerModel)
+    S2TConformerModel
+)
 from fairseq.models.speech_to_text.s2t_transformer import Conv1dSubsampler
 from fairseq.modules import (
     FairseqDropout,
     LayerNorm,
     PositionalEmbedding,
     TransformerEncoderLayer,
+    LearnableDenseLayerHistory
 )
 
 logger = logging.getLogger(__name__)
@@ -208,10 +210,17 @@ class TextEncoder(FairseqEncoder):
         else:
             self.layer_norm = None
 
-    def forward(self, x, encoder_padding_mask=None, positions=None):
+    def forward(self, x, encoder_padding_mask=None, positions=None, history=None):
 
         for layer in self.layers:
+            if history is not None:
+                x = history.pop()
             x = layer(x, encoder_padding_mask, pos_emb=positions)
+            if history is not None:
+                history.add(x)
+
+        if history is not None:
+            x = history.pop()
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)
@@ -241,7 +250,16 @@ class S2TSATEEncoder(FairseqEncoder):
         # text encoder
         self.text_encoder = TextEncoder(args, embed_tokens)
 
+        if getattr(args, "use_enc_dlcl", False):
+            normalize_before = args.encoder_normalize_before
+            layer_num = args.encoder_layers + args.text_encoder_layers + 1
+            self.history = LearnableDenseLayerHistory(normalize_before, layer_num, args.encoder_embed_dim, True)
+        else:
+            self.history = None
+
     def forward(self, src_tokens, src_lengths):
+        if self.history is not None:
+            self.history.clean()
 
         acoustic_encoder_out = self.acoustic_encoder(src_tokens, src_lengths)
 
@@ -254,7 +272,18 @@ class S2TSATEEncoder(FairseqEncoder):
 
         x, positions = self.adapter(x, encoder_padding_mask)
 
-        x = self.text_encoder(x, encoder_padding_mask, positions)
+        if self.history is not None:
+            acoustic_history = self.acoustic_encoder.history
+            layer_num = acoustic_history.layer_num
+            idx = torch.arange(layer_num).unsqueeze(0).T.repeat(1, layer_num).to(x.device)
+            self.history.weight.scatter(0, idx, acoustic_history.weight)
+            self.history.layers.extend(acoustic_history.layers)
+            self.history.count = acoustic_history.count
+            self.history.sum = acoustic_history.sum
+
+            self.history.add(x)
+
+        x = self.text_encoder(x, encoder_padding_mask, positions, self.history)
 
         return {
             "ctc_logit": [ctc_logit],    # T x B x C

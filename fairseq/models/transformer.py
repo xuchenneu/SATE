@@ -27,6 +27,7 @@ from fairseq.modules import (
     SinusoidalPositionalEmbedding,
     TransformerDecoderLayer,
     TransformerEncoderLayer,
+    CreateLayerHistory
 )
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
@@ -778,6 +779,11 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         else:
             self.layer_norm = None
 
+        if getattr(args, "use_dec_dlcl", False):
+            self.history = CreateLayerHistory(args, is_encoder=False)
+        else:
+            self.history = None
+
         self.project_out_dim = (
             Linear(embed_dim, self.output_embed_dim, bias=False)
             if embed_dim != self.output_embed_dim and not args.tie_adaptive_weights
@@ -913,6 +919,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - the decoder's features of shape `(batch, tgt_len, embed_dim)`
                 - a dictionary with any model-specific outputs
         """
+        if self.history is not None:
+            self.history.clean()
+
         if alignment_layer is None:
             alignment_layer = self.num_layers - 1
 
@@ -948,6 +957,10 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
 
+        # add emb into history
+        if self.history is not None:
+            self.history.add(x)
+
         self_attn_padding_mask: Optional[Tensor] = None
         if self.cross_self_attention or prev_output_tokens.eq(self.padding_idx).any():
             self_attn_padding_mask = prev_output_tokens.eq(self.padding_idx)
@@ -956,6 +969,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
         for idx, layer in enumerate(self.layers):
+            if self.history is not None:
+                x = self.history.pop()
+
             if incremental_state is None and not full_context_alignment:
                 self_attn_mask = self.buffered_future_mask(x)
             else:
@@ -982,6 +998,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             inner_states.append(x)
             if layer_attn is not None and idx == alignment_layer:
                 attn = layer_attn.float().to(x)
+            if self.history is not None:
+                self.history.add(x)
 
         if attn is not None:
             if alignment_heads is not None:
@@ -989,6 +1007,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
             # average probabilities over heads
             attn = attn.mean(dim=0)
+
+        if self.history is not None:
+            x = self.history.pop()
 
         if self.layer_norm is not None:
             x = self.layer_norm(x)

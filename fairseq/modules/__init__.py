@@ -21,7 +21,7 @@ from .grad_multiply import GradMultiply
 from .gumbel_vector_quantizer import GumbelVectorQuantizer
 from .kmeans_vector_quantizer import KmeansVectorQuantizer
 from .layer_drop import LayerDropModuleList
-from .layer_history import CreateLayerHistory
+from .layer_history import CreateLayerHistory, LearnableDenseLayerHistory
 from .layer_norm import Fp32LayerNorm, LayerNorm
 from .learned_positional_embedding import LearnedPositionalEmbedding
 from .lightweight_convolution import LightweightConv, LightweightConv1dTBC
@@ -65,6 +65,7 @@ __all__ = [
     "KmeansVectorQuantizer",
     "LayerDropModuleList",
     "LayerNorm",
+    "LearnableDenseLayerHistory",
     "LearnedPositionalEmbedding",
     "LightweightConv1dTBC",
     "LightweightConv",

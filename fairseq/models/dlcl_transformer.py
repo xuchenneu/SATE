@@ -55,8 +55,10 @@ class DLCLTransformerModel(TransformerModel):
         
         # dense layer parameters
         parser.add_argument('--encoder-history-type',
+                            default="learnable_dense",
                             help='encoder layer history type')
         parser.add_argument('--decoder-history-type',
+                            default="learnable_dense",
                             help='decoder layer history type')
         parser.add_argument('--encoder-integration-type', choices=['avg', 'sum'],
                             help='encoder layer integration type')
