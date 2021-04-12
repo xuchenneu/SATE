@@ -319,7 +319,7 @@ class RelativeMultiheadAttention(MultiheadAttention):
             range_mat = range_vec.repeat(length, 1)
             distance_mat = range_mat - range_mat.transpose(0, 1)
         else:
-            distance_mat = torch.range(-length + 1, 0).view(1, -1)
+            distance_mat = torch.arange(-length + 1, 1).view(1, -1)
 
         distance_mat_clipped = torch.clamp(distance_mat, -max_relative_length, max_relative_length)
 
