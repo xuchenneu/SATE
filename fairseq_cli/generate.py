@@ -352,7 +352,7 @@ def _main(cfg: DictConfig, output_file, translation_path=None):
 
                 # Score only the top hypothesis
                 if has_target and j == 0:
-                    translation_list.append([src_str, target_str, detok_hypo_str])
+                    translation_list.append([str(sample_id), src_str, target_str, detok_hypo_str, str(float(hypo["score"].cpu()) / math.log(2))])
                     if align_dict is not None or cfg.common_eval.post_process is not None:
                         # Convert back to tokens for evaluation with unk replacement and/or without BPE
                         target_tokens = tgt_dict.encode_line(
