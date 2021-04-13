@@ -377,6 +377,14 @@ def load_model_ensemble_and_task(
             # build model for ensemble
             model = task.build_model(cfg.model)
 
+            new_model = dict()
+            for key in state["model"].keys():
+                org_key = key
+                key = key.replace("transformer_layer", "layer").replace("conformer_layer", "layer")
+                new_model[key] = state["model"][org_key]
+            del state["model"]
+            state["model"] = new_model
+
             model.load_state_dict(state["model"], strict=strict, model_cfg=cfg.model)
 
             # reset state so it gets loaded for the next model in ensemble
