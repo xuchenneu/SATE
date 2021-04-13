@@ -11,9 +11,7 @@ from pathlib import Path
 import shutil
 from itertools import groupby
 from tempfile import NamedTemporaryFile
-from typing import Tuple
 import string
-import pickle
 
 import numpy as np
 import pandas as pd
@@ -74,11 +72,11 @@ class ST_Dataset(Dataset):
                 sample_rate = torchaudio.info(wav_path.as_posix())[0].rate
             except TypeError:
                 sample_rate = torchaudio.info(wav_path.as_posix()).sample_rate
-            seg_group = sorted(_seg_group, key=lambda x: x["offset"])
+            seg_group = sorted(_seg_group, key=lambda x: float(x["offset"]))
             for i, segment in enumerate(seg_group):
                 offset = int(float(segment["offset"]) * sample_rate)
                 n_frames = int(float(segment["duration"]) * sample_rate)
-                _id = f"{wav_path.stem}_{i}"
+                _id = f"{split}_{wav_path.stem}_{i}"
                 self.data.append(
                     (
                         wav_path.as_posix(),
@@ -87,7 +85,7 @@ class ST_Dataset(Dataset):
                         sample_rate,
                         segment[src_lang],
                         segment[tgt_lang],
-                        segment["speaker_id"],
+                        segment["speaker_id"] if "speaker_id" in segment else "spk1",
                         _id,
                     )
                 )
@@ -188,7 +186,7 @@ def process(args):
             for items in tqdm(dataset):
                 for item in items:
                     index += 1
-                    waveform, sr, _, _, _, utt_id = item
+                    waveform, sr, _, _, _, _, utt_id = item
 
                     if gen_feature_flag:
                         features_path = (feature_root / f"{utt_id}.npy").as_posix()
@@ -259,41 +257,55 @@ def process(args):
 
     # Generate vocab
     v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
-    spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
+    asr_spm_filename = None
+
     if args.task == "st" and args.add_src:
         if args.share:
-            spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
+            if args.st_spm_prefix is not None:
+                spm_filename_prefix = args.st_spm_prefix
+            else:
+                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
             asr_spm_filename = spm_filename_prefix + ".model"
         else:
+            if args.st_spm_prefix is not None:
+                spm_filename_prefix = args.st_spm_prefix
+            else:
+                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
+            assert args.asr_prefix is not None
             asr_spm_filename = args.asr_prefix + ".model"
-    else:
-        asr_spm_filename = None
+    elif args.task == "asr":
+        if args.asr_prefix is not None:
+            spm_filename_prefix = args.asr_prefix
+        else:
+            spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
 
-    if len(train_text) == 0:
-        print("Loading the training text to build dictionary...")
-        for split in splits:
-            if split.startswith("train"):
-                dataset = ST_Dataset(args.data_root, src_lang, tgt_lang, split)
-                src_text = dataset.get_src_text()
-                tgt_text = dataset.get_tgt_text()
-                for src_utt, tgt_utt in zip(src_text, tgt_text):
-                    if args.task == "st" and args.add_src and args.share:
-                        if args.lowercase_src:
-                            src_utt = src_utt.lower()
-                        if args.rm_punc_src:
-                            src_utt = src_utt.translate(None, string.punctuation)
-                        train_text.append(src_utt)
-                    train_text.append(tgt_utt)
+    if args.st_spm_prefix is None:
+        if len(train_text) == 0:
+            print("Loading the training text to build dictionary...")
+            for split in splits:
+                if split.startswith("train"):
+                    dataset = ST_Dataset(args.data_root, src_lang, tgt_lang, split)
+                    src_text = dataset.get_src_text()
+                    tgt_text = dataset.get_tgt_text()
+                    for src_utt, tgt_utt in zip(src_text, tgt_text):
+                        if args.task == "st" and args.add_src and args.share:
+                            if args.lowercase_src:
+                                src_utt = src_utt.lower()
+                            if args.rm_punc_src:
+                                src_utt = src_utt.translate(None, string.punctuation)
+                            train_text.append(src_utt)
+                        train_text.append(tgt_utt)
 
-    with NamedTemporaryFile(mode="w") as f:
-        for t in train_text:
-            f.write(t + "\n")
-        gen_vocab(
-            Path(f.name),
-            output_root / spm_filename_prefix,
-            args.vocab_type,
-            args.vocab_size,
-        )
+        with NamedTemporaryFile(mode="w") as f:
+            for t in train_text:
+                f.write(t + "\n")
+            gen_vocab(
+                Path(f.name),
+                output_root / spm_filename_prefix,
+                args.vocab_type,
+                args.vocab_size,
+            )
+
     # Generate config YAML
     yaml_filename = f"config_{args.task}.yaml"
     if args.task == "st" and args.add_src and args.share:
@@ -324,7 +336,6 @@ def main():
     parser.add_argument(
         "--vocab-type",
         default="unigram",
-        required=True,
         type=str,
         choices=["bpe", "unigram", "char"],
     ),
@@ -339,7 +350,8 @@ def main():
     parser.add_argument("--share", action="store_true",
                         help="share the tokenizer and dictionary of the transcription and translation")
     parser.add_argument("--add-src", action="store_true", help="add the src text for st task")
-    parser.add_argument("--asr-prefix", type=str, help="prefix of the asr dict")
+    parser.add_argument("--asr-prefix", type=str, default=None, help="prefix of the asr dict")
+    parser.add_argument("--st-spm-prefix", type=str, default=None, help="prefix of the existing st dict")
     parser.add_argument("--lowercase-src", action="store_true", help="lowercase the source text")
     parser.add_argument("--rm-punc-src", action="store_true", help="remove the punctuation of the source text")
     parser.add_argument("--cmvn-type", default="utterance",

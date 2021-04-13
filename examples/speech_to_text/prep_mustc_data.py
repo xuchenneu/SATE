@@ -50,10 +50,12 @@ class MUSTC(Dataset):
     # SPLITS = ["train_debug", "dev"]
     LANGUAGES = ["de", "es", "fr", "it", "nl", "pt", "ro", "ru"]
 
-    def __init__(self, root: str, lang: str, split: str, speed_perturb: bool = False) -> None:
+    def __init__(self, root: str, lang: str, split: str, speed_perturb: bool = False, tokenizer: bool = False) -> None:
         assert split in self.SPLITS and lang in self.LANGUAGES
         _root = Path(root) / f"en-{lang}" / "data" / split
         wav_root, txt_root = _root / "wav", _root / "txt"
+        if tokenizer:
+            txt_root = _root / "txt.tok"
         assert _root.is_dir() and wav_root.is_dir() and txt_root.is_dir(), (_root, wav_root, txt_root)
         # Load audio segments
         try:
@@ -162,26 +164,23 @@ def process(args):
         else:
             output_root = Path(args.output_root).absolute() / f"en-{lang}"
 
-        # Extract features
-        if args.speed_perturb:
-            feature_root = output_root / "fbank80_sp"
-        else:
-            feature_root = output_root / "fbank80"
-        feature_root.mkdir(exist_ok=True)
         if args.speed_perturb:
             zip_path = output_root / "fbank80_sp.zip"
         else:
             zip_path = output_root / "fbank80.zip"
         index = 0
 
-        gen_feature_flag = False
-        if not Path.exists(zip_path):
-            gen_feature_flag = True
+        # Extract features
+        if args.overwrite or not Path.exists(zip_path):
+            if args.speed_perturb:
+                feature_root = output_root / "fbank80_sp"
+            else:
+                feature_root = output_root / "fbank80"
+            feature_root.mkdir(exist_ok=True)
 
-        if args.overwrite or gen_feature_flag:
             for split in MUSTC.SPLITS:
                 print(f"Fetching split {split}...")
-                dataset = MUSTC(root.as_posix(), lang, split, args.speed_perturb)
+                dataset = MUSTC(root.as_posix(), lang, split, args.speed_perturb, args.tokenizer)
                 is_train_split = split.startswith("train")
                 print("Extracting log mel filter bank features...")
                 if is_train_split and args.cmvn_type == "global":
@@ -193,13 +192,12 @@ def process(args):
                         index += 1
                         waveform, sr, _, _, _, _, utt_id = item
 
-                        if gen_feature_flag:
-                            features_path = (feature_root / f"{utt_id}.npy").as_posix()
-                            features = extract_fbank_features(waveform, sr, Path(features_path))
+                        features_path = (feature_root / f"{utt_id}.npy").as_posix()
+                        features = extract_fbank_features(waveform, sr, Path(features_path))
 
-                            if split == 'train' and args.cmvn_type == "global" and not utt_id.startswith("sp"):
-                                if len(gcmvn_feature_list) < args.gcmvn_max_num:
-                                    gcmvn_feature_list.append(features)
+                        if split == 'train' and args.cmvn_type == "global" and not utt_id.startswith("sp"):
+                            if len(gcmvn_feature_list) < args.gcmvn_max_num:
+                                gcmvn_feature_list.append(features)
 
                     if is_train_split and args.size != -1 and index > args.size:
                         break
@@ -213,6 +211,9 @@ def process(args):
             # Pack features into ZIP
             print("ZIPing features...")
             create_zip(feature_root, zip_path)
+
+            # # Clean up
+            # shutil.rmtree(feature_root)
 
         gen_manifest_flag = False
         for split in MUSTC.SPLITS:
@@ -232,7 +233,7 @@ def process(args):
                 manifest = {c: [] for c in MANIFEST_COLUMNS}
                 if args.task == "st" and args.add_src:
                     manifest["src_text"] = []
-                dataset = MUSTC(args.data_root, lang, split, args.speed_perturb)
+                dataset = MUSTC(args.data_root, lang, split, args.speed_perturb, args.tokenizer)
                 for idx in range(len(dataset)):
                     items = dataset.get_fast(idx)
                     for item in items:
@@ -262,23 +263,11 @@ def process(args):
                 df = filter_manifest_df(df, is_train_split=is_train_split)
                 save_df_to_tsv(df, output_root / f"{split}_{args.task}.tsv")
 
-        # Generate vocab
-        v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
-        spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
-        if args.task == "st" and args.add_src:
-            if args.share:
-                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
-                asr_spm_filename = spm_filename_prefix + ".model"
-            else:
-                asr_spm_filename = args.asr_prefix + ".model"
-        else:
-            asr_spm_filename = None
-
         if len(train_text) == 0:
             print("Loading the training text to build dictionary...")
             for split in MUSTC.SPLITS:
                 if split.startswith("train"):
-                    dataset = MUSTC(args.data_root, lang, split)
+                    dataset = MUSTC(args.data_root, lang, split, args.speed_perturb, args.tokenizer)
                     src_text = dataset.get_src_text()
                     tgt_text = dataset.get_tgt_text()
                     for src_utt, tgt_utt in zip(src_text, tgt_text):
@@ -291,6 +280,18 @@ def process(args):
                                 src_utt = src_utt.replace("  ", "")
                             train_text.append(src_utt)
                         train_text.append(tgt_utt)
+
+        # Generate vocab
+        v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
+        spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
+        if args.task == "st" and args.add_src:
+            if args.share:
+                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
+                asr_spm_filename = spm_filename_prefix + ".model"
+            else:
+                asr_spm_filename = args.asr_prefix + ".model"
+        else:
+            asr_spm_filename = None
 
         with NamedTemporaryFile(mode="w") as f:
             for t in train_text:
@@ -319,9 +320,6 @@ def process(args):
             asr_spm_filename=asr_spm_filename,
             share_src_and_tgt=True if args.task == "asr" else False
         )
-
-        # Clean up
-        shutil.rmtree(feature_root)
 
 
 def process_joint(args):
@@ -392,6 +390,7 @@ def main():
     parser.add_argument("--asr-prefix", type=str, help="prefix of the asr dict")
     parser.add_argument("--lowercase-src", action="store_true", help="lowercase the source text")
     parser.add_argument("--rm-punc-src", action="store_true", help="remove the punctuation of the source text")
+    parser.add_argument("--tokenizer", action="store_true", help="use tokenizer txt")
     parser.add_argument("--cmvn-type", default="utterance",
                         choices=["global", "utterance"],
                         help="The type of cepstral mean and variance normalization")
