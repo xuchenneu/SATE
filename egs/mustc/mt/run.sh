@@ -32,18 +32,19 @@ src_lang=en
 tgt_lang=de
 lang=${src_lang}-${tgt_lang}
 
-dataset=mustc
+dataset=mustc-v2
 task=translation
 vocab_type=unigram
 vocab_size=10000
 share_dict=1
-lc_rm=1
+lcrm=1
+tokenizer=1
 
 use_specific_dict=1
-specific_prefix=st_share10k_lcrm
-specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
-src_vocab_prefix=spm_unigram10000_st_share
-tgt_vocab_prefix=spm_unigram10000_st_share
+specific_prefix=wmt_share32k
+specific_dir=/home/xuchen/st/data/wmt/mt_lcrm/en-de/unigram32000_share
+src_vocab_prefix=spm_unigram32000_share
+tgt_vocab_prefix=spm_unigram32000_share
 
 org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/mt/${lang}
@@ -53,6 +54,7 @@ test_subset=tst-COMMON
 trans_set=test
 
 # exp
+exp_prefix=${time}
 extra_tag=
 extra_parameter=
 exp_tag=baseline
@@ -72,7 +74,7 @@ n_average=10
 beam_size=5
 
 if [[ ${use_specific_dict} -eq 1 ]]; then
-    exp_tag=${specific_prefix}_${exp_tag}
+    exp_prefix=${specific_prefix}_${exp_prefix}
     data_dir=${data_dir}/${specific_prefix}
     mkdir -p ${data_dir}
 else
@@ -85,13 +87,24 @@ else
         tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_share
     fi
 fi
+if [[ ${lcrm} -eq 1 ]]; then
+    data_dir=${data_dir}_lcrm
+    exp_prefix=${exp_prefix}_lcrm
+fi
+if [[ ${tokenizer} -eq 1 ]]; then
+    train_subset=${train_subset}.tok
+    valid_subset=${valid_subset}.tok
+    test_subset=${test_subset}.tok
+    data_dir=${data_dir}_tok
+    exp_prefix=${exp_prefix}_tok
+fi
 
 . ./local/parse_options.sh || exit 1;
 
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=$(basename ${train_config%.*})_${exp_tag}
+    exp_name=${exp_prefix}_$(basename ${train_config%.*})_${exp_tag}
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
@@ -136,7 +149,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
     {
         cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
-        if [[ ${lc_rm} -eq 1 ]]; then
+        if [[ ${lcrm} -eq 1 ]]; then
             cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
         fi
         cmd="${cmd}

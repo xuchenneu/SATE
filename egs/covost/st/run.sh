@@ -32,24 +32,25 @@ src_lang=en
 tgt_lang=de
 lang=${src_lang}-${tgt_lang}
 
-dataset=wmt
-task=translation
+dataset=mustc
+task=speech_to_text
 vocab_type=unigram
-vocab_size=32000
+asr_vocab_size=5000
+vocab_size=10000
 share_dict=1
+speed_perturb=0
 lcrm=1
+tokenizer=1
 
-use_specific_dict=1
-specific_prefix=st_tok_share10k
-specific_dir=/home/xuchen/st/data/mustc/st_lcrm_tok/en-de
-src_vocab_prefix=spm_unigram10000_st_share
-tgt_vocab_prefix=spm_unigram10000_st_share
+use_specific_dict=0
+specific_prefix=valid
+specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
+asr_vocab_prefix=spm_unigram10000_st_share
+st_vocab_prefix=spm_unigram10000_st_share
 
-org_data_dir=~/st/data/${dataset}
-data_dir=~/st/data/${dataset}/mt/${lang}
-train_subset=train
-valid_subset=dev
-test_subset=test
+org_data_dir=/media/data/${dataset}
+data_dir=~/st/data/${dataset}/st
+test_subset=tst-COMMON
 
 # exp
 exp_prefix=${time}
@@ -59,36 +60,38 @@ exp_tag=baseline
 exp_name=
 
 # config
-train_config=train.yaml
+train_config=train_ctc.yaml
 
 # training setting
 fp16=1
-max_tokens=4096
-step_valid=1
+max_tokens=40000
+step_valid=0
 bleu_valid=0
 
 # decoding setting
 n_average=10
 beam_size=5
 
-if [[ ${use_specific_dict} -eq 1 ]]; then
-    exp_prefix=${exp_prefix}_${specific_prefix}
-    data_dir=${data_dir}/${specific_prefix}
-    mkdir -p ${data_dir}
+if [[ ${share_dict} -eq 1 ]]; then
+	data_config=config_st_share.yaml
 else
-    data_dir=${data_dir}/${vocab_type}${vocab_size}
-    src_vocab_prefix=spm_${vocab_type}${vocab_size}_${src_lang}
-    tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_${tgt_lang}
-    if [[ $share_dict -eq 1 ]]; then
-        data_dir=${data_dir}_share
-        src_vocab_prefix=spm_${vocab_type}${vocab_size}_share
-        tgt_vocab_prefix=spm_${vocab_type}${vocab_size}_share
-    fi
+	data_config=config_st.yaml
 fi
-
+if [[ ${speed_perturb} -eq 1 ]]; then
+    data_dir=${data_dir}_sp
+    exp_prefix=${exp_prefix}_sp
+fi
 if [[ ${lcrm} -eq 1 ]]; then
     data_dir=${data_dir}_lcrm
     exp_prefix=${exp_prefix}_lcrm
+fi
+if [[ ${use_specific_dict} -eq 1 ]]; then
+    data_dir=${data_dir}_${specific_prefix}
+    exp_prefix=${exp_prefix}_${specific_prefix}
+fi
+if [[ ${tokenizer} -eq 1 ]]; then
+    data_dir=${data_dir}_tok
+    exp_prefix=${exp_prefix}_tok
 fi
 
 . ./local/parse_options.sh || exit 1;
@@ -101,7 +104,7 @@ if [[ -z ${exp_name} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
 fi
-model_dir=$root_dir/../checkpoints/$dataset/mt/${exp_name}
+model_dir=$root_dir/../checkpoints/$dataset/st/${exp_name}
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
     echo "stage -1: Data Download"
@@ -110,80 +113,81 @@ fi
 
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
-    echo "stage 0: MT Data Preparation"
-    if [[ ! -e ${data_dir} ]]; then
-        mkdir -p ${data_dir}
+    ### But you can utilize Kaldi recipes in most cases
+    echo "stage 0: ASR Data Preparation"
+    if [[ ! -e ${data_dir}/${lang} ]]; then
+        mkdir -p ${data_dir}/${lang}
     fi
+    source ~/tools/audio/bin/activate
 
-    if [[ ! -f ${data_dir}/${src_vocab_prefix}.txt || ! -f ${data_dir}/${tgt_vocab_prefix}.txt ]]; then
-        if [[ ${use_specific_dict} -eq 0 ]]; then
-            cmd="python ${root_dir}/examples/speech_to_text/prep_mt_data.py
-                --data-root ${org_data_dir}
-                --output-root ${data_dir}
-                --splits ${train_subset},${valid_subset},${test_subset}
-                --src-lang ${src_lang}
-                --tgt-lang ${tgt_lang}
-                --lowercase-src
-                --rm-punc-src
-                --vocab-type ${vocab_type}
-                --vocab-size ${vocab_size}"
-            if [[ $share_dict -eq 1 ]]; then
-                cmd="$cmd
-                --share"
-            fi
-            echo -e "\033[34mRun command: \n${cmd} \033[0m"
-            [[ $eval -eq 1 ]] && eval ${cmd}
+    cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
+        --data-root ${org_data_dir}
+        --output-root ${data_dir}
+        --task asr
+        --vocab-type ${vocab_type}
+        --vocab-size ${asr_vocab_size}"
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        cmd="$cmd
+        --speed-perturb"
+    fi
+    echo -e "\033[34mRun command: \n${cmd} \033[0m"
+    [[ $eval -eq 1 && ${share_dict} -ne 1 && ${use_specific_dict} -ne 1 ]] && eval $cmd
+    asr_prefix=spm_${vocab_type}${asr_vocab_size}_asr
+
+    echo "stage 0: ST Data Preparation"
+    cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
+        --data-root ${org_data_dir}
+        --output-root ${data_dir}
+        --task st
+        --add-src
+        --cmvn-type utterance
+        --vocab-type ${vocab_type}
+        --vocab-size ${vocab_size}"
+
+    if [[ ${use_specific_dict} -eq 1 ]]; then
+        cp -r ${specific_dir}/${asr_vocab_prefix}.* ./
+        cp -r ${specific_dir}/${st_vocab_prefix}.* ./
+        if [[ $share_dict -eq 1 ]]; then
+            cmd="$cmd
+        --share
+        --st-spm-prefix ${st_vocab_prefix}"
         else
-            cp -r ${specific_dir}/${src_vocab_prefix}.* ${data_dir}
-            cp ${specific_dir}/${tgt_vocab_prefix}.* ${data_dir}
+            cmd="$cmd
+        --st-spm-prefix ${st_vocab_prefix}
+        --asr-prefix ${asr_vocab_prefix}"
+        fi
+    else
+        if [[ $share_dict -eq 1 ]]; then
+            cmd="$cmd
+        --share"
+        else
+            cmd="$cmd
+        --asr-prefix ${asr_prefix}"
         fi
     fi
-
-    mkdir -p ${data_dir}/data
-    for split in ${train_subset} ${valid_subset} ${test_subset}; do
-    {
-        cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
-        if [[ ${lcrm} -eq 1 ]]; then
-            cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
-        fi
-        cmd="${cmd}
-        | spm_encode --model ${data_dir}/${src_vocab_prefix}.model
-        --output_format=piece
-        > ${data_dir}/data/${split}.${src_lang}"
-
-        echo -e "\033[34mRun command: \n${cmd} \033[0m"
-        [[ $eval -eq 1 ]] && eval ${cmd}
-
-        cmd="spm_encode
-        --model ${data_dir}/${tgt_vocab_prefix}.model
-        --output_format=piece
-        < ${org_data_dir}/${lang}/data/${split}.${tgt_lang}
-        > ${data_dir}/data/${split}.${tgt_lang}"
-
-        echo -e "\033[34mRun command: \n${cmd} \033[0m"
-        [[ $eval -eq 1 ]] && eval ${cmd}
-    }&
-    done
-    wait
-
-    cmd="python ${root_dir}/fairseq_cli/preprocess.py
-        --source-lang ${src_lang} --target-lang ${tgt_lang}
-        --trainpref ${data_dir}/data/${train_subset}
-        --validpref ${data_dir}/data/${valid_subset}
-        --testpref ${data_dir}/data/${test_subset}
-        --destdir ${data_dir}/data-bin
-        --srcdict ${data_dir}/${src_vocab_prefix}.txt
-        --tgtdict ${data_dir}/${tgt_vocab_prefix}.txt
-        --workers 64"
+    if [[ ${speed_perturb} -eq 1 ]]; then
+        cmd="$cmd
+        --speed-perturb"
+    fi
+    if [[ ${lcrm} -eq 1 ]]; then
+        cmd="$cmd
+        --lowercase-src
+        --rm-punc-src"
+    fi
+    if [[ ${tokenizer} -eq 1 ]]; then
+        cmd="$cmd
+        --tokenizer"
+    fi
 
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
+    deactivate
 fi
 
-data_dir=${data_dir}/data-bin
+data_dir=${data_dir}/${lang}
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
-    echo "stage 1: MT Network Training"
+    echo "stage 1: ST Network Training"
     [[ ! -d ${data_dir} ]] && echo "The data dir ${data_dir} is not existing!" && exit 1;
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
@@ -209,8 +213,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
 
     cmd="python3 -u ${root_dir}/fairseq_cli/train.py
         ${data_dir}
-        --source-lang ${src_lang}
-        --target-lang ${tgt_lang}
+        --config-yaml ${data_config}
         --train-config ${train_config}
         --task ${task}
         --max-tokens ${max_tokens}
@@ -233,12 +236,11 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         --fp16"
     fi
     if [[ $step_valid -eq 1 ]]; then
-        validate_interval=1
-        save_interval=1
-        keep_last_epochs=10
-        no_epoch_checkpoints=0
-        save_interval_updates=10000
-        keep_interval_updates=10
+        validate_interval=10000
+        save_interval=10000
+        no_epoch_checkpoints=1
+        save_interval_updates=5000
+        keep_interval_updates=3
     else
         validate_interval=1
         keep_last_epochs=10
@@ -296,7 +298,7 @@ fi
 wait
 
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
-    echo "stage 2: MT Decoding"
+    echo "stage 2: ST Decoding"
     if [[ ${n_average} -ne 1 ]]; then
         # Average models
 		dec_model=avg_${n_average}_checkpoint.pt
@@ -328,20 +330,16 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 
     test_subset=(${test_subset//,/ })
 	for subset in ${test_subset[@]}; do
+        subset=${subset}_st
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}
-        --source-lang ${src_lang}
-        --target-lang ${tgt_lang}
+        --config-yaml ${data_config}
         --gen-subset ${subset}
-        --task ${task}
+        --task speech_to_text
         --path ${model_dir}/${dec_model}
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
-        --post-process sentencepiece
-        --tokenizer moses
-        --moses-source-lang ${src_lang}
-        --moses-target-lang ${tgt_lang}
         --scoring sacrebleu"
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 

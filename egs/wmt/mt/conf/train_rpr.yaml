@@ -2,7 +2,7 @@ train-subset: train
 valid-subset: valid
 
 max-epoch: 50
-max-update: 100000
+max-update: 1000000
 
 num-workers: 8
 patience: 10

@@ -1,5 +1,5 @@
-train-subset: train_st
-valid-subset: dev_st
+train-subset: train_asr
+valid-subset: dev_asr
 
 max-epoch: 50
 max-update: 100000
@@ -37,13 +37,3 @@ encoder-ffn-embed-dim: 2048
 encoder-layers: 12
 decoder-layers: 6
 encoder-attention-heads: 4
-
-encoder-attention-type: relative
-#decoder-attention-type: relative
-max-relative-length: 100
-
-#decoder-embed-dim: 256
-#decoder-ffn-embed-dim: 2048
-#decoder-attention-heads: 4
-#attention-dropout: 0.1
-#activation-dropout: 0.1

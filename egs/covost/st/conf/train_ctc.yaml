@@ -11,11 +11,10 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-pretrained-acoustic-encoder-from: /home/xuchen/st/checkpoints/mustc/asr/train_ctc_st_vocab/avg_10_checkpoint.pt
-#load-pretrained-text-encoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
-#load-pretrained-decoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
+#load-pretrained-encoder-from:
+#load-pretrained-decoder-from:
 
-arch: s2t_sate
+arch: s2t_transformer_s
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
@@ -29,8 +28,6 @@ ctc-weight: 0.3
 criterion: label_smoothed_cross_entropy_with_ctc
 label_smoothing: 0.1
 
-encoder-normalize-before: True
-decoder-normalize-before: True
 conv-kernel-sizes: 5,5
 conv-channels: 1024
 dropout: 0.1
@@ -38,20 +35,8 @@ activation-fn: relu
 encoder-embed-dim: 256
 encoder-ffn-embed-dim: 2048
 encoder-layers: 12
-text-encoder-layers: 6
 decoder-layers: 6
 encoder-attention-heads: 4
-
-macaron-style: True
-use-cnn-module: True
-cnn-module-kernel: 31
-
-acoustic-encoder: transformer
-adapter: league
-
-encoder-attention-type: relative
-#decoder-attention-type: relative
-max-relative-length: 100
 
 #decoder-embed-dim: 256
 #decoder-ffn-embed-dim: 2048

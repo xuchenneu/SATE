@@ -4,15 +4,14 @@ eval=1
 
 root_dir=~/st/Fairseq-S2T
 data_dir=/home/xuchen/st/data/wmt/test
-vocab_dir=/home/xuchen/st/data/wmt/mt_lcrm/en-de/unigram32000_share
+vocab_dir=/home/xuchen/st/data/wmt/mt/en-de/unigram32000_share
 src_vocab_prefix=spm_unigram32000_share
 tgt_vocab_prefix=spm_unigram32000_share
 
 src_lang=en
 tgt_lang=de
 tokenize=1
-lcrm=1
-splits=(tst-COMMON newstest2014 newstest2016)
+splits=(newstest2014 newstest2016)
 
 for split in ${splits[@]}; do
     src_file=${data_dir}/${split}.${src_lang}
@@ -30,15 +29,11 @@ for split in ${splits[@]}; do
         tgt_file=${tgt_file}.tok
     fi
 
-    cmd="cat ${src_file}"
-    if [[ ${lcrm} -eq 1 ]]; then
-        cmd="python local/lower_rm.py ${src_file}"
-    fi
-    cmd="${cmd}
-    | spm_encode --model ${vocab_dir}/${src_vocab_prefix}.model
+    cmd="spm_encode
+    --model ${vocab_dir}/${src_vocab_prefix}.model
     --output_format=piece
+    < ${src_file}
     > ${src_file}.spm"
-
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
 

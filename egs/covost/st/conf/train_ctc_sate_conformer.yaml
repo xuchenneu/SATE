@@ -11,7 +11,7 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-pretrained-acoustic-encoder-from: /home/xuchen/st/checkpoints/mustc/asr/train_ctc_st_vocab/avg_10_checkpoint.pt
+#load-pretrained-acoustic-encoder-from: /home/xuchen/st/checkpoints/mustc/asr/train_ctc_baseline/avg_10_checkpoint.pt
 #load-pretrained-text-encoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
 #load-pretrained-decoder-from: /home/xuchen/st/checkpoints/mustc/mt/st_share10k_train_baseline/avg_10_checkpoint.pt
 
@@ -46,12 +46,8 @@ macaron-style: True
 use-cnn-module: True
 cnn-module-kernel: 31
 
-acoustic-encoder: transformer
+acoustic-encoder: conformer
 adapter: league
-
-encoder-attention-type: relative
-#decoder-attention-type: relative
-max-relative-length: 100
 
 #decoder-embed-dim: 256
 #decoder-ffn-embed-dim: 2048

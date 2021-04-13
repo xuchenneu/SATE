@@ -2,18 +2,18 @@
 
 # training the model
 
-gpu_num=7
-update_freq=1
-max_tokens=4096
+gpu_num=8
+update_freq=2
+max_tokens=20000
 
-extra_tag=
+extra_tag=lcrm
 extra_parameter=
 
 #extra_tag="${extra_tag}"
 #extra_parameter="${extra_parameter} "
 
-exp_tag=baseline
-train_config=train.yaml
+exp_tag=
+train_config=train_ctc.yaml
 
 cmd="./run.sh
     --stage 1
@@ -24,9 +24,6 @@ cmd="./run.sh
     --max_tokens ${max_tokens}
     "
 
-if [[ -n ${exp_name} ]]; then
-    cmd="$cmd --exp_name ${exp_name}"
-fi
 if [[ -n ${exp_tag} ]]; then
     cmd="$cmd --exp_tag ${exp_tag}"
 fi

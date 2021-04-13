@@ -32,27 +32,27 @@ src_lang=en
 tgt_lang=de
 lang=${src_lang}-${tgt_lang}
 
-dataset=wmt
+dataset=mustc
 task=translation
 vocab_type=unigram
-vocab_size=32000
+vocab_size=10000
 share_dict=1
-lcrm=1
+lc_rm=1
 
 use_specific_dict=1
-specific_prefix=st_tok_share10k
-specific_dir=/home/xuchen/st/data/mustc/st_lcrm_tok/en-de
+specific_prefix=st_share10k_lcrm
+specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
 src_vocab_prefix=spm_unigram10000_st_share
 tgt_vocab_prefix=spm_unigram10000_st_share
 
-org_data_dir=~/st/data/${dataset}
+org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/mt/${lang}
 train_subset=train
 valid_subset=dev
-test_subset=test
+test_subset=tst-COMMON
+trans_set=test
 
 # exp
-exp_prefix=${time}
 extra_tag=
 extra_parameter=
 exp_tag=baseline
@@ -64,7 +64,7 @@ train_config=train.yaml
 # training setting
 fp16=1
 max_tokens=4096
-step_valid=1
+step_valid=0
 bleu_valid=0
 
 # decoding setting
@@ -72,7 +72,7 @@ n_average=10
 beam_size=5
 
 if [[ ${use_specific_dict} -eq 1 ]]; then
-    exp_prefix=${exp_prefix}_${specific_prefix}
+    exp_tag=${specific_prefix}_${exp_tag}
     data_dir=${data_dir}/${specific_prefix}
     mkdir -p ${data_dir}
 else
@@ -86,17 +86,12 @@ else
     fi
 fi
 
-if [[ ${lcrm} -eq 1 ]]; then
-    data_dir=${data_dir}_lcrm
-    exp_prefix=${exp_prefix}_lcrm
-fi
-
 . ./local/parse_options.sh || exit 1;
 
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=${exp_prefix}_$(basename ${train_config%.*})_${exp_tag}
+    exp_name=$(basename ${train_config%.*})_${exp_tag}
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
     fi
@@ -123,8 +118,6 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
                 --splits ${train_subset},${valid_subset},${test_subset}
                 --src-lang ${src_lang}
                 --tgt-lang ${tgt_lang}
-                --lowercase-src
-                --rm-punc-src
                 --vocab-type ${vocab_type}
                 --vocab-size ${vocab_size}"
             if [[ $share_dict -eq 1 ]]; then
@@ -143,7 +136,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     for split in ${train_subset} ${valid_subset} ${test_subset}; do
     {
         cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
-        if [[ ${lcrm} -eq 1 ]]; then
+        if [[ ${lc_rm} -eq 1 ]]; then
             cmd="python local/lower_rm.py ${org_data_dir}/${lang}/data/${split}.${src_lang}"
         fi
         cmd="${cmd}
@@ -326,8 +319,8 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
-    test_subset=(${test_subset//,/ })
-	for subset in ${test_subset[@]}; do
+    trans_set=(${trans_set//,/ })
+	for subset in ${trans_set[@]}; do
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}
         --source-lang ${src_lang}

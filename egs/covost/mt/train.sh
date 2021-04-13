@@ -2,7 +2,7 @@
 
 # training the model
 
-gpu_num=7
+gpu_num=1
 update_freq=1
 max_tokens=4096
 
@@ -24,9 +24,6 @@ cmd="./run.sh
     --max_tokens ${max_tokens}
     "
 
-if [[ -n ${exp_name} ]]; then
-    cmd="$cmd --exp_name ${exp_name}"
-fi
 if [[ -n ${exp_tag} ]]; then
     cmd="$cmd --exp_tag ${exp_tag}"
 fi

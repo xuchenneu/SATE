@@ -20,7 +20,7 @@ stop_stage=0
 
 ######## hardware ########
 # devices
-device=()
+#device=()
 gpu_num=8
 update_freq=1
 
@@ -32,19 +32,28 @@ src_lang=en
 tgt_lang=de
 lang=${src_lang}-${tgt_lang}
 
-dataset=mustc
+dataset=mustc-v2
 task=speech_to_text
 vocab_type=unigram
 asr_vocab_size=5000
 vocab_size=10000
 share_dict=1
 speed_perturb=0
+lcrm=1
+tokenizer=0
+
+use_specific_dict=0
+specific_prefix=valid
+specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
+asr_vocab_prefix=spm_unigram10000_st_share
+st_vocab_prefix=spm_unigram10000_st_share
 
 org_data_dir=/media/data/${dataset}
-data_dir=~/st/data/${dataset}/st_lcrm
+data_dir=~/st/data/${dataset}/st
 test_subset=tst-COMMON
 
 # exp
+exp_prefix=${time}
 extra_tag=
 extra_parameter=
 exp_tag=baseline
@@ -68,9 +77,21 @@ if [[ ${share_dict} -eq 1 ]]; then
 else
 	data_config=config_st.yaml
 fi
-
 if [[ ${speed_perturb} -eq 1 ]]; then
     data_dir=${data_dir}_sp
+    exp_prefix=${exp_prefix}_sp
+fi
+if [[ ${lcrm} -eq 1 ]]; then
+    data_dir=${data_dir}_lcrm
+    exp_prefix=${exp_prefix}_lcrm
+fi
+if [[ ${use_specific_dict} -eq 1 ]]; then
+    data_dir=${data_dir}_${specific_prefix}
+    exp_prefix=${exp_prefix}_${specific_prefix}
+fi
+if [[ ${tokenizer} -eq 1 ]]; then
+    data_dir=${data_dir}_tok
+    exp_prefix=${exp_prefix}_tok
 fi
 
 . ./local/parse_options.sh || exit 1;
@@ -78,12 +99,9 @@ fi
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=$(basename ${train_config%.*})_${exp_tag}
+    exp_name=${exp_prefix}_$(basename ${train_config%.*})_${exp_tag}
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
-    fi
-    if [[ ${speed_perturb} -eq 1 ]]; then
-        exp_name=sp_${exp_name}
     fi
 fi
 model_dir=$root_dir/../checkpoints/$dataset/st/${exp_name}
@@ -113,7 +131,8 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --speed-perturb"
     fi
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
-    [[ $eval -eq 1 && ${share_dict} -ne 1 ]] && eval $cmd
+    [[ $eval -eq 1 && ${share_dict} -ne 1 && ${use_specific_dict} -ne 1 ]] && eval $cmd
+    asr_prefix=spm_${vocab_type}${asr_vocab_size}_asr
 
     echo "stage 0: ST Data Preparation"
     cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
@@ -121,21 +140,43 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --output-root ${data_dir}
         --task st
         --add-src
-        --lowercase-src
-        --rm-punc-src
         --cmvn-type utterance
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
-    if [[ $share_dict -eq 1 ]]; then
-        cmd="$cmd
+
+    if [[ ${use_specific_dict} -eq 1 ]]; then
+        cp -r ${specific_dir}/${asr_vocab_prefix}.* ${data_dir}/${lang}
+        cp -r ${specific_dir}/${st_vocab_prefix}.* ${data_dir}/${lang}
+        if [[ $share_dict -eq 1 ]]; then
+            cmd="$cmd
+        --share
+        --st-spm-prefix ${st_vocab_prefix}"
+        else
+            cmd="$cmd
+        --st-spm-prefix ${st_vocab_prefix}
+        --asr-prefix ${asr_vocab_prefix}"
+        fi
+    else
+        if [[ $share_dict -eq 1 ]]; then
+            cmd="$cmd
         --share"
-	else
-        cmd="$cmd
-        --asr-prefix spm_${vocab_type}${asr_vocab_size}_asr"
+        else
+            cmd="$cmd
+        --asr-prefix ${asr_prefix}"
+        fi
     fi
     if [[ ${speed_perturb} -eq 1 ]]; then
         cmd="$cmd
         --speed-perturb"
+    fi
+    if [[ ${lcrm} -eq 1 ]]; then
+        cmd="$cmd
+        --lowercase-src
+        --rm-punc-src"
+    fi
+    if [[ ${tokenizer} -eq 1 ]]; then
+        cmd="$cmd
+        --tokenizer"
     fi
 
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
