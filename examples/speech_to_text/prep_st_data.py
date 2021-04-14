@@ -12,6 +12,7 @@ import shutil
 from itertools import groupby
 from tempfile import NamedTemporaryFile
 import string
+import csv
 
 import numpy as np
 import pandas as pd
@@ -159,11 +160,6 @@ def process(args):
 
     # Extract features
     if args.speed_perturb:
-        feature_root = output_root / "fbank80_sp"
-    else:
-        feature_root = output_root / "fbank80"
-    feature_root.mkdir(exist_ok=True)
-    if args.speed_perturb:
         zip_path = output_root / "fbank80_sp.zip"
     else:
         zip_path = output_root / "fbank80.zip"
@@ -174,6 +170,12 @@ def process(args):
         gen_feature_flag = True
 
     if args.overwrite or gen_feature_flag:
+        if args.speed_perturb:
+            feature_root = output_root / "fbank80_sp"
+        else:
+            feature_root = output_root / "fbank80"
+        feature_root.mkdir(exist_ok=True)
+
         for split in splits:
             print(f"Fetching split {split}...")
             dataset = ST_Dataset(root.as_posix(), src_lang, tgt_lang, split, args.speed_perturb)
@@ -209,6 +211,9 @@ def process(args):
         print("ZIPing features...")
         create_zip(feature_root, zip_path)
 
+        # Clean up
+        shutil.rmtree(feature_root)
+
     gen_manifest_flag = False
     for split in splits:
         if not Path.exists(output_root / f"{split}_{args.task}.tsv"):
@@ -226,6 +231,7 @@ def process(args):
             manifest = {c: [] for c in MANIFEST_COLUMNS}
             if args.task == "st" and args.add_src:
                 manifest["src_text"] = []
+
             dataset = ST_Dataset(args.data_root, src_lang, tgt_lang, split, args.speed_perturb)
             for idx in range(len(dataset)):
                 items = dataset.get_fast(idx)
@@ -251,50 +257,65 @@ def process(args):
                 if args.task == "st" and args.add_src and args.share:
                     train_text.extend(manifest["src_text"])
                 train_text.extend(manifest["tgt_text"])
+
             df = pd.DataFrame.from_dict(manifest)
             df = filter_manifest_df(df, is_train_split=is_train_split)
             save_df_to_tsv(df, output_root / f"{split}_{args.task}.tsv")
 
     # Generate vocab
     v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
+    spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
     asr_spm_filename = None
+    gen_vocab_flag = True
 
     if args.task == "st" and args.add_src:
         if args.share:
             if args.st_spm_prefix is not None:
+                gen_vocab_flag = False
                 spm_filename_prefix = args.st_spm_prefix
             else:
                 spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
             asr_spm_filename = spm_filename_prefix + ".model"
         else:
             if args.st_spm_prefix is not None:
+                gen_vocab_flag = False
                 spm_filename_prefix = args.st_spm_prefix
-            else:
-                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
             assert args.asr_prefix is not None
             asr_spm_filename = args.asr_prefix + ".model"
     elif args.task == "asr":
         if args.asr_prefix is not None:
+            gen_vocab_flag = False
             spm_filename_prefix = args.asr_prefix
-        else:
-            spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
 
-    if args.st_spm_prefix is None:
+    if gen_vocab_flag:
         if len(train_text) == 0:
             print("Loading the training text to build dictionary...")
-            for split in splits:
+
+            for split in args.SPLITS:
                 if split.startswith("train"):
-                    dataset = ST_Dataset(args.data_root, src_lang, tgt_lang, split)
-                    src_text = dataset.get_src_text()
-                    tgt_text = dataset.get_tgt_text()
-                    for src_utt, tgt_utt in zip(src_text, tgt_text):
-                        if args.task == "st" and args.add_src and args.share:
+                    csv_path = output_root / f"{split}_{args.task}.tsv"
+                    with open(csv_path) as f:
+                        reader = csv.DictReader(
+                            f,
+                            delimiter="\t",
+                            quotechar=None,
+                            doublequote=False,
+                            lineterminator="\n",
+                            quoting=csv.QUOTE_NONE,
+                        )
+
+                    if args.task == "st" and args.add_src and args.share:
+                        for e in reader:
+                            src_utt = dict(e)["src_text"]
                             if args.lowercase_src:
                                 src_utt = src_utt.lower()
                             if args.rm_punc_src:
-                                src_utt = src_utt.translate(None, string.punctuation)
+                                for w in string.punctuation:
+                                    src_utt = src_utt.replace(w, "")
+                                src_utt = src_utt.replace("  ", "")
                             train_text.append(src_utt)
-                        train_text.append(tgt_utt)
+                    tgt_text = [dict(e)["tgt_text"] for e in reader]
+                    train_text.extend(tgt_text)
 
         with NamedTemporaryFile(mode="w") as f:
             for t in train_text:
@@ -324,9 +345,6 @@ def process(args):
         asr_spm_filename=asr_spm_filename,
         share_src_and_tgt=True if args.task == "asr" else False
     )
-
-    # Clean up
-    shutil.rmtree(feature_root)
 
 
 def main():

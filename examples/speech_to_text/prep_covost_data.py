@@ -213,6 +213,7 @@ def process(args):
         # Extract features
         feature_root = output_root / "fbank80"
         feature_root.mkdir(exist_ok=True)
+
         for split in CoVoST.SPLITS:
             print(f"Fetching split {split}...")
             dataset = CoVoST(root, split, args.src_lang, args.tgt_lang)
@@ -270,24 +271,28 @@ def process(args):
     v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
     spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{task}"
     asr_spm_filename = None
+    gen_vocab_flag = True
 
     if args.task == "st" and args.add_src:
         if args.share:
             if args.st_spm_prefix is not None:
+                gen_vocab_flag = False
                 spm_filename_prefix = args.st_spm_prefix
             else:
                 spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
             asr_spm_filename = spm_filename_prefix + ".model"
         else:
             if args.st_spm_prefix is not None:
+                gen_vocab_flag = False
                 spm_filename_prefix = args.st_spm_prefix
             assert args.asr_prefix is not None
             asr_spm_filename = args.asr_prefix + ".model"
     elif args.task == "asr":
         if args.asr_prefix is not None:
+            gen_vocab_flag = False
             spm_filename_prefix = args.asr_prefix
 
-    if args.st_spm_prefix is None:
+    if gen_vocab_flag:
         with NamedTemporaryFile(mode="w") as f:
             for t in train_text:
                 f.write(t + "\n")
