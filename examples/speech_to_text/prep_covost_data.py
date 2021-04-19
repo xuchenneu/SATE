@@ -137,6 +137,7 @@ class CoVoST(Dataset):
         if self.no_translation:
             print("No target translation.")
             df = cv_tsv[["path", "sentence", "client_id"]]
+            df = df.set_index(["path"], drop=False)
         else:
             covost_url = self.COVOST_URL_TEMPLATE.format(
                 src_lang=source_language, tgt_lang=target_language
@@ -165,26 +166,26 @@ class CoVoST(Dataset):
         self.data = []
         for e in data:
             try:
-                # path = self.root / "clips" / e["path"]
-                # _ = torchaudio.info(path.as_posix())
+                path = self.root / "wav" / e["path"]
+                _ = torchaudio.info(path.as_posix())
                 self.data.append(e)
             except RuntimeError:
                 pass
 
     def __getitem__(
         self, n: int
-    ) -> Tuple[Path, int, int, str, str, Optional[str], str, str]:
+    ) -> Tuple[Path, int, int, str, str, str, str]:
         """Load the n-th sample from the dataset.
 
         Args:
             n (int): The index of the sample to be loaded
 
         Returns:
-            tuple: ``(waveform, sample_rate, sentence, translation, speaker_id,
+            tuple: ``(wav_path, sample_rate, n_frames, sentence, translation, speaker_id,
             sample_id)``
         """
         data = self.data[n]
-        path = self.root / "clips" / data["path"]
+        path = self.root / "wav" / data["path"]
         info = torchaudio.info(path)
         sample_rate = info.sample_rate
         n_frames = info.num_frames
@@ -235,9 +236,9 @@ def process(args):
     # Generate TSV manifest
     print("Generating manifest...")
     train_text = []
-    task = f"asr_{args.src_lang}"
-    if args.tgt_lang is not None:
-        task = f"st_{args.src_lang}_{args.tgt_lang}"
+    task = args.task
+    # if args.tgt_lang is not None:
+    #     task = f"st_{args.src_lang}_{args.tgt_lang}"
     for split in CoVoST.SPLITS:
         manifest = {c: [] for c in MANIFEST_COLUMNS}
         if args.task == "st" and args.add_src:
@@ -255,7 +256,7 @@ def process(args):
                     src_utt = src_utt.replace(w, "")
                 src_utt = src_utt.replace("  ", "")
             manifest["tgt_text"].append(src_utt if args.tgt_lang is None else tgt_utt)
-            if args.tgt_lang is not None:
+            if args.task == "st" and args.add_src:
                 manifest["src_text"].append(src_utt)
             manifest["speaker"].append(speaker_id)
         is_train_split = split.startswith("train")

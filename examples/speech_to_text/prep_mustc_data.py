@@ -46,7 +46,7 @@ class MUSTC(Dataset):
     utterance_id
     """
 
-    SPLITS = ["dev", "tst-COMMON", "tst-HE", "train"]
+    SPLITS = ["dev", "tst-COMMON", "train"]
     # SPLITS = ["train_debug", "dev"]
     LANGUAGES = ["de", "es", "fr", "it", "nl", "pt", "ro", "ru"]
 
@@ -123,6 +123,20 @@ class MUSTC(Dataset):
                 items.append([waveform, sr, sp_n_frames, src_utt, tgt_utt, spk_id, sp_utt_id])
         return items
 
+    def get_wav(self, n: int, speed_perturb=1.0):
+        wav_path, offset, n_frames, sr, src_utt, tgt_utt, spk_id, utt_id = self.data[n]
+
+        if self.speed_perturb is None or speed_perturb == 1.0:
+            waveform, _ = torchaudio.load(wav_path, frame_offset=offset, num_frames=n_frames)
+        else:
+            waveform, _ = torchaudio.load(wav_path, frame_offset=offset, num_frames=n_frames)
+            effects = [
+                ["speed", f"{speed_perturb}"],
+                ["rate", f"{sr}"]
+            ]
+            waveform, _ = torchaudio.sox_effects.apply_effects_tensor(waveform, sr, effects)
+        return waveform
+
     def get_fast(self, n: int):
         wav_path, offset, n_frames, sr, src_utt, tgt_utt, spk_id, utt_id = self.data[n]
 
@@ -187,13 +201,21 @@ def process(args):
                     print("And estimating cepstral mean and variance stats...")
                     gcmvn_feature_list = []
 
-                for items in tqdm(dataset):
+                for idx in tqdm(range(len(dataset))):
+                    items = dataset.get_fast(idx)
                     for item in items:
                         index += 1
-                        waveform, sr, _, _, _, _, utt_id = item
+                        wav_path, sr, _, _, _, _, utt_id = item
 
                         features_path = (feature_root / f"{utt_id}.npy").as_posix()
-                        features = extract_fbank_features(waveform, sr, Path(features_path))
+                        if not os.path.exists(features_path):
+                            sp = 1.0
+                            if dataset.speed_perturb is not None:
+                                sp = float(utt_id.split("_")[0].replace("sp", ""))
+                            waveform = dataset.get_wav(idx, sp)
+                            if waveform.shape[1] == 0:
+                                continue
+                            features = extract_fbank_features(waveform, sr, Path(features_path))
 
                         if split == 'train' and args.cmvn_type == "global" and not utt_id.startswith("sp"):
                             if len(gcmvn_feature_list) < args.gcmvn_max_num:

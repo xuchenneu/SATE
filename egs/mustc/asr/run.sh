@@ -58,7 +58,6 @@ exp_name=
 # config
 train_config=train_ctc.yaml
 data_config=config_asr.yaml
-data_config=config_st_share.yaml
 
 # training setting
 fp16=1

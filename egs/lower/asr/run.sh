@@ -29,19 +29,27 @@ pwd_dir=$PWD
 
 # dataset
 src_lang=swa
-lang=${src_lang}
+tgt_lang=en
+lang=${src_lang}-${tgt_lang}
 
 dataset=lower
 task=speech_to_text
 vocab_type=unigram
-vocab_size=10000
-speed_perturb=0
+vocab_size=1000
+speed_perturb=1
+lcrm=1
 
-org_data_dir=/media/data/${dataset}
-data_dir=~/st/data/${dataset}
+use_specific_dict=0
+specific_prefix=valid
+specific_dir=/home/xuchen/st/data/mustc/st_lcrm/en-de
+asr_vocab_prefix=spm_unigram10000_st_share
+
+org_data_dir=~/st/data/${dataset}/asr
+data_dir=~/st/data/${dataset}/asr
 test_subset=test
 
 # exp
+exp_prefix=${time}
 extra_tag=
 extra_parameter=
 exp_tag=baseline
@@ -49,7 +57,7 @@ exp_name=
 
 # config
 train_config=train_ctc.yaml
-data_config=config.yaml
+data_config=config_asr.yaml
 
 # training setting
 fp16=1
@@ -62,6 +70,15 @@ beam_size=5
 
 if [[ ${speed_perturb} -eq 1 ]]; then
     data_dir=${data_dir}_sp
+    exp_prefix=${exp_prefix}_sp
+fi
+if [[ ${lcrm} -eq 1 ]]; then
+    data_dir=${data_dir}_lcrm
+    exp_prefix=${exp_prefix}_lcrm
+fi
+if [[ ${use_specific_dict} -eq 1 ]]; then
+    data_dir=${data_dir}_${specific_prefix}
+    exp_prefix=${exp_prefix}_${specific_prefix}
 fi
 
 . ./local/parse_options.sh || exit 1;
@@ -69,12 +86,9 @@ fi
 # full path
 train_config=$pwd_dir/conf/${train_config}
 if [[ -z ${exp_name} ]]; then
-    exp_name=$(basename ${train_config%.*})_${exp_tag}
+    exp_name=${exp_prefix}_$(basename ${train_config%.*})_${exp_tag}
     if [[ -n ${extra_tag} ]]; then
         exp_name=${exp_name}_${extra_tag}
-    fi
-    if [[ ${speed_perturb} -eq 1 ]]; then
-        exp_name=sp_${exp_name}
     fi
 fi
 model_dir=$root_dir/../checkpoints/$dataset/asr/${exp_name}
@@ -87,25 +101,41 @@ fi
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     ### Task dependent. You have to make data the following preparation part by yourself.
     ### But you can utilize Kaldi recipes in most cases
-    echo "stage 0: Data Preparation"
-
-    if [[ ! -e ${data_dir} ]]; then
-        mkdir -p ${data_dir}
+    echo "stage 0: ASR Data Preparation"
+    if [[ ! -e ${data_dir}/${lang} ]]; then
+        mkdir -p ${data_dir}/${lang}
     fi
     source ~/tools/audio/bin/activate
 
-    cmd="python ${root_dir}/examples/speech_to_text/prep_librispeech_data.py
+    cmd="python ${root_dir}/examples/speech_to_text/prep_st_data.py
         --data-root ${org_data_dir}
         --output-root ${data_dir}
+        --src-lang ${src_lang}
+        --tgt-lang ${tgt_lang}
+        --task asr
         --vocab-type ${vocab_type}
         --vocab-size ${vocab_size}"
+
+    if [[ ${use_specific_dict} -eq 1 ]]; then
+        cp -r ${specific_dir}/${asr_vocab_prefix}.* ${data_dir}/${lang}
+        cmd="$cmd
+        --asr-prefix ${asr_vocab_prefix}"
+    fi
     if [[ ${speed_perturb} -eq 1 ]]; then
         cmd="$cmd
         --speed-perturb"
     fi
+    if [[ ${lcrm} -eq 1 ]]; then
+        cmd="$cmd
+        --lowercase-src
+        --rm-punc-src"
+    fi
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
-    [[ $eval -eq 1 ]] && eval $cmd
+    [[ $eval -eq 1 ]] && eval ${cmd}
+    deactivate
 fi
+
+data_dir=${data_dir}/${lang}
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     echo "stage 1: ASR Network Training"
@@ -242,7 +272,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 
     test_subset=(${test_subset//,/ })
 	for subset in ${test_subset[@]}; do
-        subset=${subset}
+        subset=${subset}_asr
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}
         --config-yaml ${data_config}
@@ -252,7 +282,11 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
-        --scoring wer"
+        --scoring wer
+        --wer-tokenizer 13a
+        --wer-lowercase
+        --wer-remove-punct
+        "
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 
         if [[ $eval -eq 1 ]]; then
