@@ -218,8 +218,10 @@ class TransformerModel(FairseqEncoderDecoderModel):
             ],
             help="transformer decoder self-attention layer type"
         )
-        parser.add_argument('--max-relative-length', type=int, default=-1,
-                            help='the max relative length')
+        parser.add_argument('--max-encoder-relative-length', type=int, default=-1,
+                            help='the max encoder relative length')
+        parser.add_argument('--max-decoder-relative-length', type=int, default=-1,
+                            help='the max decoder relative length')
         parser.add_argument('--k-only', default=False, action='store_true',
                             help='select the relative mode to map relative position information')
         # args for loading pre-trained models
@@ -1182,13 +1184,15 @@ def base_architecture(args):
     args.encoder_attention_type = getattr(args, "encoder_attention_type", "selfattn")
     args.decoder_attention_type = getattr(args, "decoder_attention_type", "selfattn")
 
-    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.max_encoder_relative_length = getattr(args, 'max_encoder_relative_length', -1)
+    args.max_decoder_relative_length = getattr(args, 'max_decoder_relative_length', -1)
     args.k_only = getattr(args, 'k_only', True)
 
 
 @register_model_architecture("transformer", "transformer_relative")
 def transformer_rpr(args):
-    args.max_relative_length = 20
+    args.max_encoder_relative_length = 20
+    args.max_decoder_relative_length = 20
     args.k_only = True
     base_architecture(args)
 

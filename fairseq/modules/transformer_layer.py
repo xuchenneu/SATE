@@ -87,18 +87,24 @@ class TransformerEncoderLayer(nn.Module):
             attn_func = MultiheadAttention
         elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
-        elif self.attn_type == "relative" or getattr(args, "max_relative_length", -1) != -1:
-            return RelativeMultiheadAttention(
-                embed_dim,
-                args.encoder_attention_heads,
-                dropout=args.attention_dropout,
-                self_attention=True,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-                max_relative_length=args.max_relative_length,
-            )
+        elif self.attn_type == "relative":
+            # max_relative_length = getattr(args, "max_encoder_relative_length", -1)
+            max_relative_length = max(getattr(args, "max_encoder_relative_length", -1), getattr(args, "max_relative_length", -1))
+            if max_relative_length != -1:
+                return RelativeMultiheadAttention(
+                    embed_dim,
+                    args.encoder_attention_heads,
+                    dropout=args.attention_dropout,
+                    self_attention=True,
+                    q_noise=self.quant_noise,
+                    qn_block_size=self.quant_noise_block_size,
+                    max_relative_length=max_relative_length,
+                )
+            else:
+                print("The maximum encoder relative length %d can not be -1!" % max_relative_length)
+                exit(1)
         else:
-            print("The attention type %s is not supported!" % self.attn_type)
+            print("The encoder attention type %s is not supported!" % self.attn_type)
             exit(1)
 
         return attn_func(
@@ -292,18 +298,23 @@ class TransformerDecoderLayer(nn.Module):
             attn_func = MultiheadAttention
         elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
-        elif self.attn_type == "relative" or getattr(args, "max_relative_length", -1) != -1:
-            return RelativeMultiheadAttention(
-                embed_dim,
-                args.encoder_attention_heads,
-                dropout=args.attention_dropout,
-                self_attention=True,
-                q_noise=self.quant_noise,
-                qn_block_size=self.quant_noise_block_size,
-                max_relative_length=args.max_relative_length,
-            )
+        elif self.attn_type == "relative":
+            max_relative_length = max(getattr(args, "max_decoder_relative_length", -1), getattr(args, "max_relative_length", -1))
+            if max_relative_length != -1:
+                return RelativeMultiheadAttention(
+                    embed_dim,
+                    args.decoder_attention_heads,
+                    dropout=args.attention_dropout,
+                    self_attention=True,
+                    q_noise=self.quant_noise,
+                    qn_block_size=self.quant_noise_block_size,
+                    max_relative_length=max_relative_length,
+                )
+            else:
+                print("The maximum decoder relative length %d can not be -1!" % max_relative_length)
+                exit(1)
         else:
-            print("The attention type %s is not supported!" % self.attn_type)
+            print("The decoder attention type %s is not supported!" % self.attn_type)
             exit(1)
 
         return attn_func(

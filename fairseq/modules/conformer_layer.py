@@ -8,7 +8,13 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from fairseq import utils
-from fairseq.modules import LayerNorm, MultiheadAttention, RelPositionMultiheadAttention, ConvolutionModule
+from fairseq.modules import (
+    LayerNorm,
+    MultiheadAttention,
+    RelPositionMultiheadAttention,
+    RelativeMultiheadAttention,
+    ConvolutionModule
+)
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
@@ -112,6 +118,21 @@ class ConformerEncoderLayer(nn.Module):
             attn_func = MultiheadAttention
         elif self.attn_type == "rel_selfattn":
             attn_func = RelPositionMultiheadAttention
+        elif self.attn_type == "relative":
+            max_relative_length = getattr(args, "max_encoder_relative_length", -1)
+            if max_relative_length != -1:
+                return RelativeMultiheadAttention(
+                    embed_dim,
+                    args.encoder_attention_heads,
+                    dropout=args.attention_dropout,
+                    self_attention=True,
+                    q_noise=self.quant_noise,
+                    qn_block_size=self.quant_noise_block_size,
+                    max_relative_length=max_relative_length,
+                )
+            else:
+                print("The maximum encoder relative length %d can not be -1!" % max_relative_length)
+                exit(1)
         else:
             attn_func = MultiheadAttention
             print("The attention type %s is not supported!" % self.attn_type)

@@ -532,13 +532,16 @@ def base_architecture(args):
     args.encoder_integration_type = getattr(args, 'encoder_integration_type', 'avg')
     args.decoder_integration_type = getattr(args, 'decoder_integration_type', 'avg')
 
-    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.max_encoder_relative_length = getattr(args, 'max_encoder_relative_length', -1)
+    args.max_decoder_relative_length = getattr(args, 'max_decoder_relative_length', -1)
+
     args.k_only = getattr(args, 'k_only', True)
 
 
 @register_model_architecture("dlcl_transformer", "dlcl_transformer_relative")
 def dlcl_transformer_relative(args):
-    args.max_relative_length = 20
+    args.max_encoder_relative_length = 20
+    args.max_decoder_relative_length = 20
     args.k_only = True
 
     base_architecture(args)

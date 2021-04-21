@@ -220,7 +220,9 @@ class S2TTransformerModel(FairseqEncoderDecoderModel):
             action="store_true",
             help="if True, dont scale embeddings",
         )
-        parser.add_argument('--max-relative-length', type=int, default=-1,
+        parser.add_argument('--max-encoder-relative-length', type=int, default=-1,
+                            help='the max relative length')
+        parser.add_argument('--max-decoder-relative-length', type=int, default=-1,
                             help='the max relative length')
         parser.add_argument('--k-only', default=False, action='store_true',
                             help='select the relative mode to map relative position information')
@@ -567,7 +569,8 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
 
-    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.max_encoder_relative_length = getattr(args, 'max_encoder_relative_length', -1)
+    args.max_decoder_relative_length = getattr(args, 'max_decoder_relative_length', -1)
     args.k_only = getattr(args, 'k_only', True)
 
 
@@ -583,7 +586,8 @@ def s2t_transformer_s(args):
 
 @register_model_architecture("s2t_transformer", "s2t_transformer_s_relative")
 def s2t_transformer_s_relative(args):
-    args.max_relative_length = 20
+    args.max_encoder_relative_length = 20
+    args.max_decoder_relative_length = 20
     args.k_only = True
     s2t_transformer_s(args)
 

@@ -185,7 +185,8 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
 
-    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.max_encoder_relative_length = getattr(args, 'max_encoder_relative_length', -1)
+    args.max_decoder_relative_length = getattr(args, 'max_decoder_relative_length', -1)
     args.k_only = getattr(args, 'k_only', True)
 
 
@@ -201,7 +202,8 @@ def s2t_conformer_s(args):
 
 @register_model_architecture("s2t_conformer", "s2t_conformer_s_relative")
 def s2t_conformer_s_relative(args):
-    args.max_relative_length = 20
+    args.max_encoder_relative_length = 100
+    args.max_decoder_relative_length = 20
     args.k_only = True
     s2t_conformer_s(args)
 

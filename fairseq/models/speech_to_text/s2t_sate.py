@@ -6,6 +6,7 @@ import math
 import torch
 import torch.nn as nn
 from fairseq import checkpoint_utils
+from fairseq.data.data_utils import lengths_to_padding_mask
 from fairseq.models import (
     FairseqEncoder,
     register_model,
@@ -81,6 +82,15 @@ class S2TSATEModel(S2TTransformerModel):
     @classmethod
     def build_encoder(cls, args, task=None, embed_tokens=None):
         encoder = S2TSATEEncoder(args, task, embed_tokens)
+
+        if getattr(args, "load_pretrained_encoder_from", None):
+            logger.info(
+                f"loaded pretrained acoustic encoder from: "
+                f"{args.load_pretrained_encoder_from}"
+            )
+            encoder = checkpoint_utils.load_pretrained_component_from_model(
+                component=encoder, checkpoint=args.load_pretrained_encoder_from, strict=False
+            )
 
         if getattr(args, "load_pretrained_acoustic_encoder_from", None):
             logger.info(
@@ -202,6 +212,7 @@ class TextEncoder(FairseqEncoder):
         super().__init__(None)
 
         self.embed_tokens = embed_tokens
+
         self.layers = nn.ModuleList(
             [TransformerEncoderLayer(args) for _ in range(args.text_encoder_layers)]
         )
@@ -247,8 +258,19 @@ class S2TSATEEncoder(FairseqEncoder):
         # adapter
         self.adapter = Adapter(args, task.source_dictionary, embed_tokens)
 
+        # self.length_adapter = Conv1dSubsampler(
+        #     args.encoder_embed_dim,
+        #     args.conv_channels,
+        #     args.encoder_embed_dim,
+        #     [int(k) for k in args.conv_kernel_sizes.split(",")],
+        # )
+
+        # acoustic_encoder_attention_type = args.encoder_attention_type
+        # args.encoder_attention_type = "selfattn"
+
         # text encoder
         self.text_encoder = TextEncoder(args, embed_tokens)
+        # args.encoder_attention_type = acoustic_encoder_attention_type
 
         if getattr(args, "use_enc_dlcl", False):
             normalize_before = args.encoder_normalize_before
@@ -282,6 +304,11 @@ class S2TSATEEncoder(FairseqEncoder):
             self.history.sum = acoustic_history.sum
 
             self.history.add(x)
+
+        # src_lengths = (~encoder_padding_mask).sum(1)
+        # x = x.transpose(0, 1)
+        # x, input_lengths = self.length_adapter(x, src_lengths)
+        # encoder_padding_mask = lengths_to_padding_mask(input_lengths)
 
         x = self.text_encoder(x, encoder_padding_mask, positions, self.history)
 
@@ -375,7 +402,8 @@ def base_architecture(args):
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     args.quant_noise_pq = getattr(args, "quant_noise_pq", 0)
 
-    args.max_relative_length = getattr(args, 'max_relative_length', -1)
+    args.max_encoder_relative_length = getattr(args, 'max_encoder_relative_length', -1)
+    args.max_decoder_relative_length = getattr(args, 'max_decoder_relative_length', -1)
     args.k_only = getattr(args, 'k_only', True)
 
 
@@ -391,7 +419,8 @@ def s2t_sate_s(args):
 
 @register_model_architecture("s2t_sate", "s2t_sate_s_relative")
 def s2t_sate_s_relative(args):
-    args.max_relative_length = 20
+    args.max_encoder_relative_length = 100
+    args.max_decoder_relative_length = 20
     args.k_only = True
     s2t_sate_s(args)
 
