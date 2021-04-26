@@ -11,8 +11,8 @@ log-interval: 100
 seed: 1
 report-accuracy: True
 
-#load-params: 
-#load-pretrained-encoder-from: 
+#load-pretrained-encoder-from:
+#load-pretrained-decoder-from:
 
 arch: s2t_conformer_s
 share-decoder-input-output-embed: True
@@ -42,8 +42,8 @@ macaron-style: True
 use-cnn-module: True
 cnn-module-kernel: 31
 
-#decoder-embed-dim: 256
-#decoder-ffn-embed-dim: 2048
-#decoder-attention-heads: 4
-#attention-dropout: 0.1
-#activation-dropout: 0.1
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4
+attention-dropout: 0.1
+activation-dropout: 0.1

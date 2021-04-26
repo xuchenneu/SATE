@@ -1,8 +1,8 @@
-train-subset: train-clean-100,train-clean-360,train-other-500
-valid-subset: dev-clean
+train-subset: train_st
+valid-subset: dev_st
 
-max-epoch: 100
-max-update: 300000
+max-epoch: 50
+max-update: 100000
 
 num-workers: 8
 patience: 10
@@ -10,6 +10,9 @@ no-progress-bar: True
 log-interval: 100
 seed: 1
 report-accuracy: True
+
+#load-pretrained-encoder-from:
+#load-pretrained-decoder-from:
 
 arch: s2t_conformer_s
 share-decoder-input-output-embed: True
@@ -27,20 +30,20 @@ label_smoothing: 0.1
 
 conv-kernel-sizes: 5,5
 conv-channels: 1024
+dropout: 0.1
+activation-fn: relu
+encoder-embed-dim: 256
+encoder-ffn-embed-dim: 2048
+encoder-layers: 12
+decoder-layers: 6
+encoder-attention-heads: 4
+
 macaron-style: True
 use-cnn-module: True
 cnn-module-kernel: 31
 
-#dropout: 0.1
-#activation-fn: relu
-#encoder-embed-dim: 256
-#encoder-ffn-embed-dim: 2048
-#encoder-layers: 12
-#decoder-layers: 6
-#encoder-attention-heads: 4
-
-#decoder-embed-dim: 256
-#decoder-ffn-embed-dim: 2048
-#decoder-attention-heads: 4
-#attention-dropout: 0.1
-#activation-dropout: 0.1
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4
+attention-dropout: 0.1
+activation-dropout: 0.1

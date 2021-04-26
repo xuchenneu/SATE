@@ -40,7 +40,7 @@ share_dict=1
 lcrm=1
 tokenizer=1
 
-use_specific_dict=1
+use_specific_dict=0
 specific_prefix=wmt_share32k
 specific_dir=/home/xuchen/st/data/wmt/mt_lcrm/en-de/unigram32000_share
 src_vocab_prefix=spm_unigram32000_share
@@ -50,8 +50,8 @@ org_data_dir=/media/data/${dataset}
 data_dir=~/st/data/${dataset}/mt/${lang}
 train_subset=train
 valid_subset=dev
-test_subset=tst-COMMON
-trans_set=test
+trans_subset=tst-COMMON
+test_subset=test
 
 # exp
 exp_prefix=${time}
@@ -70,8 +70,10 @@ step_valid=0
 bleu_valid=0
 
 # decoding setting
+dec_model=checkpoint_best.pt
 n_average=10
 beam_size=5
+len_penalty=1.0
 
 if [[ ${use_specific_dict} -eq 1 ]]; then
     exp_prefix=${specific_prefix}_${exp_prefix}
@@ -94,7 +96,7 @@ fi
 if [[ ${tokenizer} -eq 1 ]]; then
     train_subset=${train_subset}.tok
     valid_subset=${valid_subset}.tok
-    test_subset=${test_subset}.tok
+    trans_subset=${trans_subset}.tok
     data_dir=${data_dir}_tok
     exp_prefix=${exp_prefix}_tok
 fi
@@ -128,7 +130,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
             cmd="python ${root_dir}/examples/speech_to_text/prep_mt_data.py
                 --data-root ${org_data_dir}
                 --output-root ${data_dir}
-                --splits ${train_subset},${valid_subset},${test_subset}
+                --splits ${train_subset},${valid_subset},${trans_subset}
                 --src-lang ${src_lang}
                 --tgt-lang ${tgt_lang}
                 --vocab-type ${vocab_type}
@@ -146,7 +148,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     fi
 
     mkdir -p ${data_dir}/data
-    for split in ${train_subset} ${valid_subset} ${test_subset}; do
+    for split in ${train_subset} ${valid_subset} ${trans_subset}; do
     {
         cmd="cat ${org_data_dir}/${lang}/data/${split}.${src_lang}"
         if [[ ${lcrm} -eq 1 ]]; then
@@ -220,6 +222,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         --train-config ${train_config}
         --task ${task}
         --max-tokens ${max_tokens}
+        --skip-invalid-size-inputs-valid-test
         --update-freq ${update_freq}
         --log-interval 100
         --save-dir ${model_dir}
@@ -314,7 +317,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
     	[[ $eval -eq 1 ]] && eval $cmd
 	else
-		dec_model=checkpoint_best.pt
+		dec_model=${dec_model}
 	fi
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
@@ -327,13 +330,12 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     fi
     export CUDA_VISIBLE_DEVICES=${device}
 
-	#tmp_file=$(mktemp ${model_dir}/tmp-XXXXX)
-	#trap 'rm -rf ${tmp_file}' EXIT
 	result_file=${model_dir}/decode_result
 	[[ -f ${result_file} ]] && rm ${result_file}
 
-    trans_set=(${trans_set//,/ })
-	for subset in ${trans_set[@]}; do
+    test_subset=(${test_subset//,/ })
+	for subset in ${test_subset[@]}; do
+        subset=${subset}_st
   		cmd="python ${root_dir}/fairseq_cli/generate.py
         ${data_dir}
         --source-lang ${src_lang}
@@ -344,11 +346,17 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
+        --lenpen ${len_penalty}
         --post-process sentencepiece
+        --scoring sacrebleu"
+
+        if [[ ${tokenizer} -eq 1 ]]; then
+            cmd="${cmd}
         --tokenizer moses
         --moses-source-lang ${src_lang}
-        --moses-target-lang ${tgt_lang}
-        --scoring sacrebleu"
+        --moses-target-lang ${tgt_lang}"
+        fi
+
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
 
         if [[ $eval -eq 1 ]]; then

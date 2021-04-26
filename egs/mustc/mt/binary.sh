@@ -29,11 +29,15 @@ for split in ${splits[@]}; do
         tgt_file=${tgt_file}.tok
     fi
 
-    cmd="spm_encode
-    --model ${vocab_dir}/${src_vocab_prefix}.model
+    cmd="cat ${src_file}"
+    if [[ ${lcrm} -eq 1 ]]; then
+        cmd="python local/lower_rm.py ${src_file}"
+    fi
+    cmd="${cmd}
+    | spm_encode --model ${vocab_dir}/${src_vocab_prefix}.model
     --output_format=piece
-    < ${src_file}
     > ${src_file}.spm"
+
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
 

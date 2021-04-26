@@ -44,3 +44,6 @@ encoder-attention-heads: 8
 decoder-embed-dim: 512
 decoder-ffn-embed-dim: 2048
 decoder-attention-heads: 8
+
+use-enc-dlcl: True
+use-dec-dlcl: True

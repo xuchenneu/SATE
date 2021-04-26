@@ -1,9 +1,8 @@
-train-subset: train-clean-100,train-clean-360,train-other-500
-#train-subset: train-clean-100
-valid-subset: dev-clean
+train-subset: train_st
+valid-subset: dev_st
 
-max-epoch: 100
-max-update: 300000
+max-epoch: 50
+max-update: 100000
 
 num-workers: 8
 patience: 10
@@ -11,6 +10,9 @@ no-progress-bar: True
 log-interval: 100
 seed: 1
 report-accuracy: True
+
+#load-pretrained-encoder-from:
+#load-pretrained-decoder-from:
 
 arch: s2t_transformer_s
 share-decoder-input-output-embed: True
@@ -34,3 +36,9 @@ encoder-ffn-embed-dim: 2048
 encoder-layers: 12
 decoder-layers: 6
 encoder-attention-heads: 4
+
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4
+attention-dropout: 0.1
+activation-dropout: 0.1

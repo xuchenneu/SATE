@@ -92,22 +92,30 @@ def process(args):
     # Generate vocab
     vocab_size = "" if args.vocab_type == "char" else str(args.vocab_size)
     spm_filename_prefix = f"spm_{args.vocab_type}{vocab_size}"
-    with NamedTemporaryFile(mode="w") as f:
-        if len(train_text) == 0:
-            print("Loading the training text...")
-            for split in SPLITS:
-                if split.startswith("train"):
-                    dataset = LIBRISPEECH(data_root.as_posix(), url=split)
-                    for wav, sample_rate, utt, spk_id, chapter_no, utt_no in dataset:
-                        train_text.append(utt.lower())
-        for t in train_text:
-            f.write(t + "\n")
-        gen_vocab(
-            Path(f.name),
-            out_root / spm_filename_prefix,
-            args.vocab_type,
-            args.vocab_size,
-        )
+
+    gen_vocab_flag = True
+    if args.asr_prefix is not None:
+        gen_vocab_flag = False
+        spm_filename_prefix = args.asr_prefix
+
+    if gen_vocab_flag:
+        with NamedTemporaryFile(mode="w") as f:
+            if len(train_text) == 0:
+                print("Loading the training text...")
+                for split in SPLITS:
+                    if split.startswith("train"):
+                        dataset = LIBRISPEECH(data_root.as_posix(), url=split)
+                        for wav, sample_rate, utt, spk_id, chapter_no, utt_no in dataset:
+                            train_text.append(utt.lower())
+            for t in train_text:
+                f.write(t + "\n")
+            gen_vocab(
+                Path(f.name),
+                out_root / spm_filename_prefix,
+                args.vocab_type,
+                args.vocab_size,
+            )
+
     # Generate config YAML
     gen_config_yaml(
         out_root, spm_filename_prefix + ".model", specaugment_policy="ld",
@@ -130,6 +138,7 @@ def main():
         choices=["bpe", "unigram", "char"],
     ),
     parser.add_argument("--vocab-size", default=10000, type=int)
+    parser.add_argument("--asr-prefix", type=str, default=None, help="prefix of the asr dict")
     parser.add_argument("--overwrite", action="store_true", help="overwrite the existing files")
     args = parser.parse_args()
 

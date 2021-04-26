@@ -32,12 +32,13 @@ src_lang=en
 tgt_lang=de
 lang=${src_lang}-${tgt_lang}
 
-dataset=mustc
+dataset=mustc-v2
 task=speech_to_text
 vocab_type=unigram
 vocab_size=5000
 speed_perturb=0
 lcrm=1
+tokenizer=0
 
 use_specific_dict=0
 specific_prefix=valid
@@ -65,8 +66,10 @@ max_tokens=40000
 step_valid=0
 
 # decoding setting
+dec_model=checkpoint_best.pt
 n_average=10
 beam_size=5
+len_penalty=1.0
 
 if [[ ${speed_perturb} -eq 1 ]]; then
     data_dir=${data_dir}_sp
@@ -79,6 +82,10 @@ fi
 if [[ ${use_specific_dict} -eq 1 ]]; then
     data_dir=${data_dir}_${specific_prefix}
     exp_prefix=${exp_prefix}_${specific_prefix}
+fi
+if [[ ${tokenizer} -eq 1 ]]; then
+    data_dir=${data_dir}_tok
+    exp_prefix=${exp_prefix}_tok
 fi
 
 . ./local/parse_options.sh || exit 1;
@@ -128,6 +135,11 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
         --lowercase-src
         --rm-punc-src"
     fi
+    if [[ ${tokenizer} -eq 1 ]]; then
+        cmd="$cmd
+        --tokenizer"
+    fi
+
     echo -e "\033[34mRun command: \n${cmd} \033[0m"
     [[ $eval -eq 1 ]] && eval ${cmd}
     deactivate
@@ -166,6 +178,7 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         --train-config ${train_config}
         --task ${task}
         --max-tokens ${max_tokens}
+        --skip-invalid-size-inputs-valid-test
         --update-freq ${update_freq}
         --log-interval 100
         --save-dir ${model_dir}
@@ -185,11 +198,12 @@ if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
         --fp16"
     fi
     if [[ $step_valid -eq 1 ]]; then
-        validate_interval=10000
-        save_interval=10000
-        no_epoch_checkpoints=1
-        save_interval_updates=5000
-        keep_interval_updates=3
+        validate_interval=1
+        save_interval=1
+        keep_last_epochs=10
+        no_epoch_checkpoints=0
+        save_interval_updates=500
+        keep_interval_updates=10
     else
         validate_interval=1
         keep_last_epochs=10
@@ -250,7 +264,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     	echo -e "\033[34mRun command: \n${cmd} \033[0m"
     	[[ $eval -eq 1 ]] && eval $cmd
 	else
-		dec_model=checkpoint_best.pt
+		dec_model=${dec_model}
 	fi
 
     if [[ -z ${device} || ${#device[@]} -eq 0 ]]; then
@@ -280,6 +294,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
         --results-path ${model_dir}
         --max-tokens ${max_tokens}
         --beam ${beam_size}
+        --lenpen ${len_penalty}
         --scoring wer
         --wer-tokenizer 13a
         --wer-lowercase

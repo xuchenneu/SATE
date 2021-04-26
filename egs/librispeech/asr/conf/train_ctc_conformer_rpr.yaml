@@ -14,7 +14,7 @@ report-accuracy: True
 #load-pretrained-encoder-from:
 #load-pretrained-decoder-from:
 
-arch: s2t_transformer_s
+arch: s2t_conformer_s
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
@@ -38,13 +38,17 @@ encoder-layers: 12
 decoder-layers: 6
 encoder-attention-heads: 4
 
+macaron-style: True
+use-cnn-module: True
+cnn-module-kernel: 31
+
 encoder-attention-type: relative
 decoder-attention-type: relative
 max-encoder-relative-length: 100
 max-decoder-relative-length: 20
 
-decoder-embed-dim: 256
-decoder-ffn-embed-dim: 2048
-decoder-attention-heads: 4
-attention-dropout: 0.1
-activation-dropout: 0.1
+#decoder-embed-dim: 256
+#decoder-ffn-embed-dim: 2048
+#decoder-attention-heads: 4
+#attention-dropout: 0.1
+#activation-dropout: 0.1

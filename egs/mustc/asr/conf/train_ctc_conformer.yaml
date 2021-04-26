@@ -1,5 +1,5 @@
-train-subset: train_asr
-valid-subset: dev_asr
+train-subset: train_st
+valid-subset: dev_st
 
 max-epoch: 50
 max-update: 100000
@@ -42,8 +42,8 @@ macaron-style: True
 use-cnn-module: True
 cnn-module-kernel: 31
 
-#decoder-embed-dim: 256
-#decoder-ffn-embed-dim: 2048
-#decoder-attention-heads: 4
-#attention-dropout: 0.1
-#activation-dropout: 0.1
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4
+attention-dropout: 0.1
+activation-dropout: 0.1
