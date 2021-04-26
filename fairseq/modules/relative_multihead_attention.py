@@ -242,10 +242,10 @@ class RelativeMultiheadAttention(MultiheadAttention):
         )
 
         if self.k_only:
-            relation_keys = F.embedding(relative_positions_matrix.long().cuda(), self.relative_position_keys)
+            relation_keys = F.embedding(relative_positions_matrix.long().to(k.device), self.relative_position_keys)
         else:
-            relation_keys = F.embedding(relative_positions_matrix.long().cuda(), self.relative_position_keys)
-            relation_values = F.embedding(relative_positions_matrix.long().cuda(), self.relative_position_values)
+            relation_keys = F.embedding(relative_positions_matrix.long().to(k.device), self.relative_position_keys)
+            relation_values = F.embedding(relative_positions_matrix.long().to(k.device), self.relative_position_values)
 
         attn_weights = self._relative_attention_inner(q, k, relation_keys, transpose=True)
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]

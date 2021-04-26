@@ -96,6 +96,16 @@ def parse_args_and_arch(
         is_config_file=True,
         help="Configuration YAML filename (for training)",
     )
+    parser.add_argument(
+        "--train-config1",
+        is_config_file=True,
+        help="Configuration YAML filename (for training)",
+    )
+    parser.add_argument(
+        "--train-config2",
+        is_config_file=True,
+        help="Configuration YAML filename (for training)",
+    )
 
     if suppress_defaults:
         # Parse args without any default values. This requires us to parse

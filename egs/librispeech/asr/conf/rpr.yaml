@@ -1,0 +1,4 @@
+encoder-attention-type: relative
+decoder-attention-type: relative
+max-encoder-relative-length: 100
+max-decoder-relative-length: 20
