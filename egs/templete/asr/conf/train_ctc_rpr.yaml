@@ -1,0 +1,50 @@
+train-subset: train_st
+valid-subset: dev_st
+
+max-epoch: 50
+max-update: 100000
+
+num-workers: 8
+patience: 10
+no-progress-bar: True
+log-interval: 100
+seed: 1
+report-accuracy: True
+
+#load-pretrained-encoder-from:
+#load-pretrained-decoder-from:
+
+arch: s2t_transformer_s
+share-decoder-input-output-embed: True
+optimizer: adam
+clip-norm: 10.0
+lr-scheduler: inverse_sqrt
+warmup-init-lr: 1e-7
+warmup-updates: 10000
+lr: 2e-3
+#adam_betas: (0.9,0.98)
+
+ctc-weight: 0.3
+criterion: label_smoothed_cross_entropy_with_ctc
+label_smoothing: 0.1
+
+conv-kernel-sizes: 5,5
+conv-channels: 1024
+dropout: 0.1
+activation-fn: relu
+encoder-embed-dim: 256
+encoder-ffn-embed-dim: 2048
+encoder-layers: 12
+decoder-layers: 6
+encoder-attention-heads: 4
+
+encoder-attention-type: relative
+decoder-attention-type: relative
+max-encoder-relative-length: 100
+max-decoder-relative-length: 20
+
+decoder-embed-dim: 256
+decoder-ffn-embed-dim: 2048
+decoder-attention-heads: 4
+attention-dropout: 0.1
+activation-dropout: 0.1

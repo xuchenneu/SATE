@@ -11,7 +11,6 @@ from pathlib import Path
 import shutil
 from itertools import groupby
 from tempfile import NamedTemporaryFile
-from typing import Tuple
 import string
 import csv
 
@@ -47,7 +46,6 @@ class MUSTC(Dataset):
     """
 
     SPLITS = ["dev", "tst-COMMON", "train"]
-    # SPLITS = ["train_debug", "dev"]
     LANGUAGES = ["de", "es", "fr", "it", "nl", "pt", "ro", "ru"]
 
     def __init__(self, root: str, lang: str, split: str, speed_perturb: bool = False, tokenizer: bool = False) -> None:
@@ -81,11 +79,11 @@ class MUSTC(Dataset):
                 sample_rate = torchaudio.info(wav_path.as_posix())[0].rate
             except TypeError:
                 sample_rate = torchaudio.info(wav_path.as_posix()).sample_rate
-            seg_group = sorted(_seg_group, key=lambda x: x["offset"])
+            seg_group = sorted(_seg_group, key=lambda x: float(x["offset"]))
             for i, segment in enumerate(seg_group):
                 offset = int(float(segment["offset"]) * sample_rate)
                 n_frames = int(float(segment["duration"]) * sample_rate)
-                _id = f"{wav_path.stem}_{i}"
+                _id = f"{split}_{wav_path.stem}_{i}"
                 self.data.append(
                     (
                         wav_path.as_posix(),
@@ -435,7 +433,7 @@ def main():
     parser.add_argument("--share", action="store_true",
                         help="share the tokenizer and dictionary of the transcription and translation")
     parser.add_argument("--add-src", action="store_true", help="add the src text for st task")
-    parser.add_argument("--asr-prefix", type=str, help="prefix of the asr dict")
+    parser.add_argument("--asr-prefix", type=str, default=None, help="prefix of the asr dict")
     parser.add_argument("--st-spm-prefix", type=str, default=None, help="prefix of the existing st dict")
     parser.add_argument("--lowercase-src", action="store_true", help="lowercase the source text")
     parser.add_argument("--rm-punc-src", action="store_true", help="remove the punctuation of the source text")

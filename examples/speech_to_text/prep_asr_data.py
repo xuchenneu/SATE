@@ -38,15 +38,15 @@ log = logging.getLogger(__name__)
 MANIFEST_COLUMNS = ["id", "audio", "n_frames", "tgt_text", "speaker"]
 
 
-class ST_Dataset(Dataset):
+class ASR_Dataset(Dataset):
     """
     Create a Dataset for MuST-C. Each item is a tuple of the form:
     waveform, sample_rate, source utterance, target utterance, speaker_id,
     utterance_id
     """
 
-    def __init__(self, root: str, src_lang, tgt_lang: str, split: str, speed_perturb: bool = False, tokenizer: bool = False) -> None:
-        _root = Path(root) / f"{src_lang}-{tgt_lang}" / split
+    def __init__(self, root: str, lang, split: str, speed_perturb: bool = False, tokenizer: bool = False) -> None:
+        _root = Path(root) / f"{lang}" / split
         wav_root, txt_root = _root / "wav", _root / "txt"
         if tokenizer:
             txt_root = _root / "txt.tok"
@@ -61,12 +61,11 @@ class ST_Dataset(Dataset):
 
         self.speed_perturb = [0.9, 1.0, 1.1] if speed_perturb and split.startswith("train") else None
         # Load source and target utterances
-        for _lang in [src_lang, tgt_lang]:
-            with open(txt_root / f"{split}.{_lang}") as f:
-                utterances = [r.strip() for r in f]
-            assert len(segments) == len(utterances)
-            for i, u in enumerate(utterances):
-                segments[i][_lang] = u
+        with open(txt_root / f"{split}.{lang}") as f:
+            utterances = [r.strip() for r in f]
+        assert len(segments) == len(utterances)
+        for i, u in enumerate(utterances):
+            segments[i][lang] = u
         # Gather info
         self.data = []
         for wav_filename, _seg_group in groupby(segments, lambda x: x["wav"]):
@@ -86,20 +85,19 @@ class ST_Dataset(Dataset):
                         offset,
                         n_frames,
                         sample_rate,
-                        segment[src_lang],
-                        segment[tgt_lang],
+                        segment[lang],
                         segment["speaker_id"] if "speaker_id" in segment else "spk1",
                         _id,
                     )
                 )
 
     def __getitem__(self, n: int):
-        wav_path, offset, n_frames, sr, src_utt, tgt_utt, spk_id, utt_id = self.data[n]
+        wav_path, offset, n_frames, sr, utt, spk_id, utt_id = self.data[n]
 
         items = []
         if self.speed_perturb is None:
             waveform, _ = torchaudio.load(wav_path, frame_offset=offset, num_frames=n_frames)
-            items.append([waveform, sr, n_frames, src_utt, tgt_utt, spk_id, utt_id])
+            items.append([waveform, sr, n_frames, utt, spk_id, utt_id])
         else:
             for speed in self.speed_perturb:
                 sp_utt_id = f"sp{speed}_" + utt_id
@@ -114,11 +112,11 @@ class ST_Dataset(Dataset):
                     ]
                     waveform, _ = torchaudio.sox_effects.apply_effects_tensor(waveform, sr, effects)
 
-                items.append([waveform, sr, sp_n_frames, src_utt, tgt_utt, spk_id, sp_utt_id])
+                items.append([waveform, sr, sp_n_frames, utt, spk_id, sp_utt_id])
         return items
 
     def get_wav(self, n: int, speed_perturb=1.0):
-        wav_path, offset, n_frames, sr, src_utt, tgt_utt, spk_id, utt_id = self.data[n]
+        wav_path, offset, n_frames, sr, utt, spk_id, utt_id = self.data[n]
 
         if self.speed_perturb is None or speed_perturb == 1.0:
             waveform, _ = torchaudio.load(wav_path, frame_offset=offset, num_frames=n_frames)
@@ -132,29 +130,23 @@ class ST_Dataset(Dataset):
         return waveform
 
     def get_fast(self, n: int):
-        wav_path, offset, n_frames, sr, src_utt, tgt_utt, spk_id, utt_id = self.data[n]
+        wav_path, offset, n_frames, sr, utt, spk_id, utt_id = self.data[n]
 
         items = []
         if self.speed_perturb is None:
-            items.append([wav_path, sr, n_frames, src_utt, tgt_utt, spk_id, utt_id])
+            items.append([wav_path, sr, n_frames, utt, spk_id, utt_id])
         else:
             for speed in self.speed_perturb:
                 sp_utt_id = f"sp{speed}_" + utt_id
                 sp_n_frames = n_frames / speed
-                items.append([wav_path, sr, sp_n_frames, src_utt, tgt_utt, spk_id, sp_utt_id])
+                items.append([wav_path, sr, sp_n_frames, utt, spk_id, sp_utt_id])
         return items
 
-    def get_src_text(self):
+    def get_text(self):
         src_text = []
         for item in self.data:
             src_text.append(item[4])
         return src_text
-
-    def get_tgt_text(self):
-        tgt_text = []
-        for item in self.data:
-            tgt_text.append(item[5])
-        return tgt_text
 
     def __len__(self) -> int:
         return len(self.data)
@@ -163,16 +155,15 @@ class ST_Dataset(Dataset):
 def process(args):
     root = Path(args.data_root).absolute()
     splits = args.splits.split(",")
-    src_lang = args.src_lang
-    tgt_lang = args.tgt_lang
-    cur_root = root / f"{src_lang}-{tgt_lang}"
+    lang = args.lang
+    cur_root = root / f"{lang}"
     if not cur_root.is_dir():
         print(f"{cur_root.as_posix()} does not exist. Skipped.")
         return
     if args.output_root is None:
         output_root = cur_root
     else:
-        output_root = Path(args.output_root).absolute() / f"{src_lang}-{tgt_lang}"
+        output_root = Path(args.output_root).absolute() / f"{lang}"
 
     # Extract features
     if args.speed_perturb:
@@ -194,7 +185,7 @@ def process(args):
 
         for split in splits:
             print(f"Fetching split {split}...")
-            dataset = ST_Dataset(root.as_posix(), src_lang, tgt_lang, split, args.speed_perturb, args.tokenizer)
+            dataset = ASR_Dataset(root.as_posix(), lang, split, args.speed_perturb, args.tokenizer)
             is_train_split = split.startswith("train")
             print("Extracting log mel filter bank features...")
             if is_train_split and args.cmvn_type == "global":
@@ -205,7 +196,7 @@ def process(args):
                 items = dataset.get_fast(idx)
                 for item in items:
                     index += 1
-                    wav_path, sr, _, _, _, _, utt_id = item
+                    wav_path, sr, _, _, _, utt_id = item
 
                     features_path = (feature_root / f"{utt_id}.npy").as_posix()
                     if not os.path.exists(features_path):
@@ -255,30 +246,26 @@ def process(args):
             if args.task == "st" and args.add_src:
                 manifest["src_text"] = []
 
-            dataset = ST_Dataset(args.data_root, src_lang, tgt_lang, split, args.speed_perturb, args.tokenizer)
+            dataset = ASR_Dataset(args.data_root, lang, split, args.speed_perturb, args.tokenizer)
             for idx in range(len(dataset)):
                 items = dataset.get_fast(idx)
                 for item in items:
-                    _, sr, n_frames, src_utt, tgt_utt, speaker_id, utt_id = item
+                    _, sr, n_frames, utt, speaker_id, utt_id = item
                     manifest["id"].append(utt_id)
                     manifest["audio"].append(zip_manifest[utt_id])
                     duration_ms = int(n_frames / sr * 1000)
                     manifest["n_frames"].append(int(1 + (duration_ms - 25) / 10))
                     if args.lowercase_src:
-                        src_utt = src_utt.lower()
+                        utt = utt.lower()
                     if args.rm_punc_src:
                         for w in string.punctuation:
-                            src_utt = src_utt.replace(w, "")
-                    manifest["tgt_text"].append(src_utt if args.task == "asr" else tgt_utt)
-                    if args.task == "st" and args.add_src:
-                        manifest["src_text"].append(src_utt)
+                            utt = utt.replace(w, "")
+                    manifest["tgt_text"].append(utt)
                     manifest["speaker"].append(speaker_id)
 
                 if is_train_split and args.size != -1 and len(manifest["id"]) > args.size:
                     break
             if is_train_split:
-                if args.task == "st" and args.add_src and args.share:
-                    train_text.extend(manifest["src_text"])
                 train_text.extend(manifest["tgt_text"])
 
             df = pd.DataFrame.from_dict(manifest)
@@ -288,27 +275,11 @@ def process(args):
     # Generate vocab
     v_size_str = "" if args.vocab_type == "char" else str(args.vocab_size)
     spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}"
-    asr_spm_filename = None
     gen_vocab_flag = True
 
-    if args.task == "st" and args.add_src:
-        if args.share:
-            if args.st_spm_prefix is not None:
-                gen_vocab_flag = False
-                spm_filename_prefix = args.st_spm_prefix
-            else:
-                spm_filename_prefix = f"spm_{args.vocab_type}{v_size_str}_{args.task}_share"
-            asr_spm_filename = spm_filename_prefix + ".model"
-        else:
-            if args.st_spm_prefix is not None:
-                gen_vocab_flag = False
-                spm_filename_prefix = args.st_spm_prefix
-            assert args.asr_prefix is not None
-            asr_spm_filename = args.asr_prefix + ".model"
-    elif args.task == "asr":
-        if args.asr_prefix is not None:
-            gen_vocab_flag = False
-            spm_filename_prefix = args.asr_prefix
+    if args.asr_prefix is not None:
+        gen_vocab_flag = False
+        spm_filename_prefix = args.asr_prefix
 
     if gen_vocab_flag:
         if len(train_text) == 0:
@@ -327,16 +298,6 @@ def process(args):
                             quoting=csv.QUOTE_NONE,
                         )
 
-                    if args.task == "st" and args.add_src and args.share:
-                        for e in reader:
-                            src_utt = dict(e)["src_text"]
-                            if args.lowercase_src:
-                                src_utt = src_utt.lower()
-                            if args.rm_punc_src:
-                                for w in string.punctuation:
-                                    src_utt = src_utt.replace(w, "")
-                                src_utt = src_utt.replace("  ", "")
-                            train_text.append(src_utt)
                     tgt_text = [dict(e)["tgt_text"] for e in reader]
                     train_text.extend(tgt_text)
 
@@ -352,8 +313,6 @@ def process(args):
 
     # Generate config YAML
     yaml_filename = f"config_{args.task}.yaml"
-    if args.task == "st" and args.add_src and args.share:
-        yaml_filename = f"config_{args.task}_share.yaml"
 
     gen_config_yaml(
         output_root,
@@ -365,7 +324,6 @@ def process(args):
             output_root / "gcmvn.npz" if args.cmvn_type == "global"
             else None
         ),
-        asr_spm_filename=asr_spm_filename,
         share_src_and_tgt=True if args.task == "asr" else False
     )
 
@@ -382,17 +340,14 @@ def main():
         choices=["bpe", "unigram", "char"],
     ),
     parser.add_argument("--vocab-size", default=8000, type=int)
-    parser.add_argument("--task", type=str, default="st", choices=["asr", "st"])
-    parser.add_argument("--src-lang", type=str, required=True, help="source language")
-    parser.add_argument("--tgt-lang", type=str, required=True, help="target language")
+    parser.add_argument("--task", type=str, default="asr", choices=["asr", "st"])
+    parser.add_argument("--lang", type=str, required=True, help="language")
     parser.add_argument("--splits", type=str, default="train,dev,test", help="dataset splits")
     parser.add_argument("--speed-perturb", action="store_true", default=False,
                         help="apply speed perturbation on wave file")
     parser.add_argument("--share", action="store_true",
                         help="share the tokenizer and dictionary of the transcription and translation")
-    parser.add_argument("--add-src", action="store_true", help="add the src text for st task")
     parser.add_argument("--asr-prefix", type=str, default=None, help="prefix of the asr dict")
-    parser.add_argument("--st-spm-prefix", type=str, default=None, help="prefix of the existing st dict")
     parser.add_argument("--lowercase-src", action="store_true", help="lowercase the source text")
     parser.add_argument("--rm-punc-src", action="store_true", help="remove the punctuation of the source text")
     parser.add_argument("--tokenizer", action="store_true", help="use tokenizer txt")
