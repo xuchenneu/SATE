@@ -1150,6 +1150,10 @@ def base_architecture(args):
     args.dropout = getattr(args, "dropout", 0.1)
     args.adaptive_softmax_cutoff = getattr(args, "adaptive_softmax_cutoff", None)
     args.adaptive_softmax_dropout = getattr(args, "adaptive_softmax_dropout", 0)
+    args.tie_adaptive_weights = getattr(args, "tie_adaptive_weights", False)
+    args.tie_adaptive_proj = getattr(args, "tie_adaptive_proj", False)
+    args.adaptive_softmax_factor = getattr(args, "adaptive_softmax_factor", 4)
+
     args.share_decoder_input_output_embed = getattr(
         args, "share_decoder_input_output_embed", False
     )
