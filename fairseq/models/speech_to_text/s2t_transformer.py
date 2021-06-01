@@ -387,6 +387,18 @@ class S2TTransformerEncoder(FairseqEncoder):
         self.layers = nn.ModuleList(
             [TransformerEncoderLayer(args) for _ in range(args.encoder_layers)]
         )
+
+        # self.inter_subsample = []
+        # for i in range(args.encoder_layers // 4 - 1):
+        #     self.inter_subsample.append(
+        #         Conv1dSubsampler(
+        #             args.encoder_embed_dim,
+        #             args.encoder_ffn_embed_dim,
+        #             args.encoder_embed_dim,
+        #             [5],
+        #         )
+        #     )
+
         if args.encoder_normalize_before:
             self.layer_norm = LayerNorm(args.encoder_embed_dim)
         else:
@@ -437,10 +449,19 @@ class S2TTransformerEncoder(FairseqEncoder):
         if self.history is not None:
             self.history.add(x)
 
+        # layer_index = 0
         for layer in self.layers:
             if self.history is not None:
                 x = self.history.pop()
             x = layer(x, encoder_padding_mask, pos_emb=positions)
+
+            # layer_index += 1
+            # if layer_index % 4 == 0:
+            #     index = layer_index // 4 - 1
+            #     x = x.transpose(0, 1)
+            #     x, input_lengths = self.inter_subsample[index](x, input_lengths)
+            #     encoder_padding_mask = lengths_to_padding_mask(input_lengths)
+
             if self.history is not None:
                 self.history.add(x)
 

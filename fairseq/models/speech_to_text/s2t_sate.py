@@ -136,7 +136,7 @@ class Adapter(nn.Module):
         adapter_type = getattr(args, "adapter", "league")
         self.adapter_type = adapter_type
 
-        if adapter_type in ["linear", "league"]:
+        if adapter_type in ["linear", "league", "gated_league", "gated_league2"]:
             self.linear_adapter = nn.Sequential(
                 nn.Linear(attention_dim, attention_dim),
                 LayerNorm(args.encoder_embed_dim),
@@ -156,7 +156,7 @@ class Adapter(nn.Module):
                 [int(k) for k in args.conv_kernel_sizes.split(",")],
             )
 
-        if adapter_type in ["embed", "context", "league", "gated_league"]:
+        if adapter_type in ["embed", "context", "league", "gated_league", "gated_league2"]:
             if embed_tokens is None:
                 num_embeddings = len(dictionary)
                 self.embed_adapter = Embedding(num_embeddings, attention_dim, self.padding_idx)
@@ -187,7 +187,9 @@ class Adapter(nn.Module):
             out = torch.mm(distribution.view(-1, embed_dim), self.embed_adapter.weight).view(batch, seq_len, -1)
 
         elif self.adapter_type == "subsample":
-            out = self.subsample_adaptor(representation, lengths)
+            representation = representation.transpose(0, 1)
+            out, input_lengths = self.subsample_adaptor(representation, lengths)
+            padding = lengths_to_padding_mask(input_lengths)
 
         elif self.adapter_type == "league":
             linear_out = self.linear_adapter(representation)
@@ -195,7 +197,7 @@ class Adapter(nn.Module):
             out = linear_out + soft_out
         elif self.adapter_type == "gated_league":
             linear_out = self.linear_adapter(representation)
-            soft_out = self.embed_adapter(distribution)
+            soft_out = torch.mm(distribution.view(-1, embed_dim), self.embed_adapter.weight).view(batch, seq_len, -1)
             coef = (self.gate_linear(torch.cat([linear_out, soft_out], dim=-1))).sigmoid()
             out = coef * linear_out + (1 - coef) * soft_out
         elif self.adapter_type == "none":
@@ -211,7 +213,7 @@ class Adapter(nn.Module):
 
         out = self.dropout_module(out)
 
-        return out, positions
+        return out, positions, padding
 
 
 class TextEncoder(FairseqEncoder):
@@ -301,7 +303,7 @@ class S2TSATEEncoder(FairseqEncoder):
         ctc_prob = self.acoustic_encoder.compute_ctc_prob(encoder_out, self.temperature)
         x = (encoder_out, ctc_prob)
 
-        x, positions = self.adapter(x, encoder_padding_mask)
+        x, positions, encoder_padding_mask = self.adapter(x, encoder_padding_mask)
 
         if self.history is not None:
             acoustic_history = self.acoustic_encoder.history

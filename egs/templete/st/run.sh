@@ -122,7 +122,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     fi
     source ~/tools/audio/bin/activate
 
-    cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
+    cmd="python ${root_dir}/examples/speech_to_text/prep_asr_data.py
         --data-root ${org_data_dir}
         --output-root ${data_dir}
         --task asr
@@ -137,7 +137,7 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
     asr_prefix=spm_${vocab_type}${asr_vocab_size}_asr
 
     echo "stage 0: ST Data Preparation"
-    cmd="python ${root_dir}/examples/speech_to_text/prep_mustc_data.py
+    cmd="python ${root_dir}/examples/speech_to_text/prep_st_data.py
         --data-root ${org_data_dir}
         --output-root ${data_dir}
         --task st

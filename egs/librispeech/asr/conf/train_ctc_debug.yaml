@@ -13,6 +13,7 @@ seed: 1
 report-accuracy: True
 
 arch: s2t_transformer_s
+arch: s2t_sate
 share-decoder-input-output-embed: True
 optimizer: adam
 clip-norm: 10.0
@@ -39,6 +40,8 @@ encoder-attention-heads: 4
 macaron-style: True
 use-cnn-module: True
 cnn-module-kernel: 31
+
+adpater: subsample
 
 #decoder-embed-dim: 256
 #decoder-ffn-embed-dim: 2048
