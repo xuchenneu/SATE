@@ -35,30 +35,6 @@ make -j src.build CUDA_HOME=<path to cuda install>
 5. gcc ≥ 4.9
 6. python包 pandas sentencepiece configargparse gpustat tensorboard editdistance
 
-服务器为8.130.161.160，账户名为xuchen，密码为点。
-
-服务器包含以下文件：
-
-```markdown
-.
-├── st
-		├── data
-		├── fairseq
-└── tools
-    ├── apex-master
-    ├── bak
-    ├── cuda10.1
-    ├── gcc
-    ├── LibriSpeech
-    ├── moses
-    ├── nccl
-    └── Python-3.8.8
-```
-
-st文件夹下包含了数据文件夹data和代码文件夹fairseq，tools文件夹下包含了上述常用包，其中bak文件夹中保存了程序未安装之前的压缩包。
-
-使用过程中注意配置.bashrc文件。
-
 # 代码结构
 
 此外，语音翻译任务需要对每个任务预先下载好原始数据，除了已经提供的数据集，如LibriSpeech和MuST-C外，其他数据集需要额外编写代码进行处理，参考examples/speech_to_text路径下的处理文件。
