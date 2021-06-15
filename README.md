@@ -14,9 +14,6 @@ Fairseq_ST基于原始的Fairseq，提高了程序易用性以及对语音到文
 - MT pipeline(bin)
 - Conformer模型结构
 - 预训练模型加载
-
-后续目标：
-
 - 相对位置表示
 - SATE模型结构
 
