@@ -1,8 +1,10 @@
-# Fairseq_ST使用说明
+# Fairseq-S2T使用说明
 
 # 简要说明
 
-Fairseq_ST基于原始的Fairseq，提高了程序易用性以及对语音到文本任务的适配。
+Fairseq-S2T基于原始的Fairseq，提高了程序易用性以及对语音到文本任务的适配。
+后续我们会完善文档说明。
+We will optimize the documentation soon!
 
 目前支持功能：
 
