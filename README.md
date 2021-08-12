@@ -1,30 +1,34 @@
-# Fairseq-S2T使用说明
+# Fairseq-S2T
 
-# 简要说明
+Adapt the fairseq toolkit for speech to text tasks.
 
-Fairseq-S2T基于原始的Fairseq，提高了程序易用性以及对语音到文本任务的适配。
+Implementation of the paper:
+[Stacked Acoustic-and-Textual Encoding: Integrating the Pre-trained Models into Speech Translation Encoders](https://arxiv.org/abs/2105.05752)
 
-后续我们会完善文档说明。
+## Key Features
 
-We will optimize the documentation soon!
+### Training
 
-目前支持功能：
+- Support the Kaldi-style complete recipe
+- ASR, MT, and ST pipeline (bin)
+- Read training config in yaml file
+- CTC multi-task learning
+- MT training in the ST-like way (Online tokenizer) (There may be bugs)
+- speed perturb during pre-processing (need torchaudio ≥ 0.8.0)
+  
+### Model
 
-- 针对每个数据集创建egs文件夹保存运行脚本，目前包括LibriSpeech语音识别数据集和MuST-C语音翻译数据集
-- 通过读取yaml配置文件进行训练
-- 支持ctc多任务学习
-- 使用ST相似的流程训练MT模型（在线分词）
-- 速度扰动 (需要torchaudio ≥ 0.8.0)
-- MT pipeline(bin)
-- Conformer模型结构
-- 预训练模型加载
-- 相对位置表示
-- SATE模型结构
+- Conformer Architecture
+- Load pre-trained model for ST
+- Relative position encoding
+- Stacked acoustic-and-textual encoding 
 
-# 需求条件
+## Installation
 
-1. Python ≥3.6
-2. torch ≥ 1.4, torchaudio ≥ 0.4.0, cuda ≥ 10.1
+* Note we only test the following environment.
+
+1. Python == 3.6
+2. torch == 1.8, torchaudio == 0.8.0, cuda == 10.2
 3. apex
 ```
 pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
@@ -33,40 +37,74 @@ pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp
 ```
 make -j src.build CUDA_HOME=<path to cuda install>
 ```
-5. gcc ≥ 4.9
-6. python包 pandas sentencepiece configargparse gpustat tensorboard editdistance
-
-# 代码结构
-
-此外，语音翻译任务需要对每个任务预先下载好原始数据，除了已经提供的数据集，如LibriSpeech和MuST-C外，其他数据集需要额外编写代码进行处理，参考examples/speech_to_text路径下的处理文件。
-
-运行脚本存放于fairseq根目录下的egs文件夹，针对每个数据集分别建立了不同的文件夹来执行操作，目前包括语音识别数据集LibriSpeech以及语音翻译数据集MuST-C的执行脚本。
-
-以librispeech文件夹举例，其中包含以下文件：
-
-```markdown
-librispeech
-├── conf
-│   └── train_config.yaml
-├── local
-│   ├── monitor.sh
-│   ├── parse_options.sh
-│   ├── path.sh
-│   └── utils.sh
-├── decode.sh
-├── history.log
-├── run.sh
-├── train_history.log
-└── train.sh
+5. gcc ≥ 4.9 (We use the version 5.4)
+6. python library 
+```
+pip install pandas sentencepiece configargparse gpustat tensorboard editdistance
 ```
 
-- run.sh是核心脚本，包含了数据的处理以及模型的训练及解码，train.sh和decode.sh分别调用run.sh来实现单独的训练和解码功能。
-- history.log保存了历史的训练信息，包含模型训练使用的显卡、数据集以及模型存储位置。
-- conf文件夹下为训练配置，目前修改了Fairseq使其支持读取yaml配置文件。模型训练所要使用的配置可以在该文件中进行设置。
-- local文件夹下为一些常用脚本
-    - monitor.sh为检测程序，可以检测是否有显卡空闲，如果空闲一定数据，则执行某个任务
-    - parse_options.sh为支持其他文件调用run.sh的辅助文件
-    - path.sh暂时还未使用
-    - utils.sh中包含了显卡检测函数
+## Code Tree
 
-mustc文件夹和librispeech文件夹类似，其中run.sh额外支持了语音翻译任务的训练。
+The shell scripts for each benchmark is in the egs folder, we create the ASR pipeline for LibriSpeech, all pipelines (ASR, MT, and ST) for MuST-C. Besides, we also provide the template for other benchmarks.
+
+Here is an example for MuST-C:
+
+```markdown
+mustc
+├── asr
+│   ├── binary.sh
+│   ├── conf
+│   ├── decode.sh
+│   ├── local
+│   ├── run.sh
+│   └── train.sh
+├── mt
+│   ├── binary.sh
+│   ├── conf
+│   ├── decode.sh
+│   ├── local
+│   ├── run.sh
+│   └── train.sh
+└── st
+    ├── binary.sh
+    ├── conf
+    ├── decode.sh
+    ├── ensemble.sh
+    ├── local
+    ├── run.sh
+    └── train.sh
+```
+
+* run.sh: the core script, which includes the whole processes
+* train.sh: call the run.sh for training
+* decode.sh: call the run.sh for decoding
+* binary.sh: generate the datasets alone
+* conf: the folder to save the configure files (.yaml). 
+* local: the folder to save utils shell scripts
+  * monitor.sh: check the GPUS for running the program automatically 
+  * parse_options.sh: parse the parameters for run.sh
+  * path.sh: no use
+  * utils.sh: the utils shell functions
+  
+## Citations
+```angular2html
+@inproceedings{xu-etal-2021-stacked,
+    title = "Stacked Acoustic-and-Textual Encoding: Integrating the Pre-trained Models into Speech Translation Encoders",
+    author = "Xu, Chen  and
+      Hu, Bojie  and
+      Li, Yanyang  and
+      Zhang, Yuhao  and
+      Huang, Shen  and
+      Ju, Qi  and
+      Xiao, Tong  and
+      Zhu, Jingbo",
+    booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
+    month = aug,
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.acl-long.204",
+    doi = "10.18653/v1/2021.acl-long.204",
+    pages = "2619--2630",
+}
+```
